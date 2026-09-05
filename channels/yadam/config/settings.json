@@ -26,20 +26,24 @@
       "_comment": "project_id는 데몬별 ~/.flow-proxy/token_<port>.json에 저장(확장 Connect 또는 /set-project). 배치 전 데몬 상주 + 각 프로필 Flow 탭 로그인 필요."
     },
     "gemini": {
-      "model": "gemini-2.5-flash-image",
-      "_comment": "engine=gemini(유료 API)일 때 이미지 모델. gemini-2.5-flash-image=Nano Banana 1(비용 기본, 2026-07-19 사용자 지정) | gemini-3-pro-image=Nano Banana Pro(2K, 더 비쌈)."
+      "model": "gemini-3.1-flash-lite-image",
+      "_comment": "engine=gemini(유료 API)일 때 이미지 모델. gemini-3.1-flash-lite-image=현행(2026-08-23 사용자 지정) | gemini-2.5-flash-image=Nano Banana 1 | gemini-3-pro-image=Nano Banana Pro(2K, 더 비쌈)."
     },
     "veo": {
-      "engine": "flow",
-      "model": "veo-3.1-fast-generate-preview",
+      "engine": "pjn",
+      "model": "veo-3.1-lite-generate-preview",
       "resolution": "1080p",
-      "_comment": "훅 인트로 i2v 립싱크 클립(scripts/render/veo_hook.py, ⚠️유료). engine=flow: labs.google 웹세션(아래 flow 블록 :3849 구독 레인, 데몬+Chrome 필요 — 2026-07-19 사용자 지시로 기본 복귀) | gemini: Gemini API(GEMINI_API_KEY, 데몬 불필요, 유료 폴백). model 필드는 gemini 전용, flow는 아래 flow.model 사용.",
+      "_comment": "훅 인트로 i2v 립싱크 클립(scripts/render/veo_hook.py, ⚠️유료). ★2026-07-28 gemini + Veo 3.1 Lite로 전환 — flow(labs.google)의 Veo 생성은 Google AI Pro/Ultra 구독 기능이라 무료 계정으로는 권한이 없다(밴이 아님). engine=gemini: GEMINI_API_KEY만 있으면 되고 데몬·Chrome 불필요. 단가: Lite 1080p $0.08/s → 8초 $0.64(약 900원) / Fast 1080p $0.15/s → 8초 $1.20(약 1,700원). Lite는 이코노미 등급이라 립싱크 정확도가 Fast보다 떨어질 수 있음 — 입이 안 맞으면 model만 veo-3.1-fast-generate-preview로 올려 --force 재생성. model 필드는 gemini 전용, flow는 아래 flow.model 사용. ★2026-08-26 기본 엔진을 pjn(로컬 5090 서버, 무료)으로 전환 — 훅 테이크는 무료로 여러 개 뽑고 확정본만 --engine gemini로 재생성하는 전략. pjn은 .env의 PJN_API_KEY 필요, MiniMax H3 i2v, 대사 프롬프트는 veo_hook_prompt_pjn.txt로 분리된다.",
       "flow": {
         "ports": [
           3849
         ],
         "model": "veo-fast",
         "_comment": "flow 엔진 전용. ports는 Google AI Pro 구독 계정 레인(nossilecture=3849)."
+      },
+      "pjn": {
+        "quality": 1.0,
+        "_comment": "pjn 엔진 전용. quality 0.4/0.6/0.8/1.0 — 1.0=1376x768. 로컬 5090 무료(PJN_API_KEY). 결과 클립은 veo_hook.py가 render 규격(1920x1080/30fps)으로 자동 재인코딩한다."
       }
     }
   },
@@ -59,15 +63,19 @@
     "silence_thresh_db": -50
   },
   "subtitle": {
-    "max_chars": 14,
-    "fps": 30
+    "max_chars": 13,
+    "fps": 30,
+    "_comment": "split_long_cues.py의 자막 분할 기준(비공백 글자수). capcut.subtitle.font_size=10 기준 한 줄 용량 ~20칸이라 13으로 확정(2026-08-02 이름석자 대본 834문단 실측: 13→최장 19칸 / 14→최장 21칸으로 경계선 초과). 폰트를 11 이상으로 올리면 12로 다시 내릴 것. ※ 폰트·색·외곽선은 여기가 아니라 capcut.subtitle 블록이다(SKILL+ §13).",
+    "fps_comment": "scene_timing 프레임 스냅용"
   },
   "render": {
     "engine": "capcut",
     "_comment_engine": "capcut 전용. capcut_export.py가 {V} 산출물로 CapCut 드래프트 생성 → 사람이 마무리 편집 후 {P}/output/에 mp4 내보내기.",
     "fps": 30,
     "width": 1920,
-    "height": 1080
+    "height": 1080,
+    "loudness_lufs": -12.8,
+    "_comment_loudness": "훅 클립(veo_hook.py)을 낭독과 같은 레벨로 맞추는 목표값. 06편 낭독 audio.mp3 실측 -12.8 LUFS 기준. 0으로 두면 정규화하지 않는다."
   },
   "capcut": {
     "subtitle": {
@@ -78,6 +86,15 @@
       "background_alpha": 0.0,
       "_comment": "자막 스타일 기본값 = 흰 글자 + 검은 외곽선 + 배경 없음(alpha 0) + 폰트 7.0(코드 기본 5.0 대비 +2pt). capcut_export.py가 이 블록을 읽는다(settings.capcut.subtitle). 검은 배경으로 돌리려면 background_alpha를 0.7로.",
       "line_max_width": 0.9
+    },
+    "ken_burns": {
+      "_comment": "★2026-08-26 사용자 지시로 대폭 강화. 종전 코드 기본값(movement_range 0.03 / zoom 1.05~1.15)은 씬 하나가 40~60초라 초당 이동량이 0.1%도 안 돼 사실상 정지 화면으로 보였다. 진폭을 키우고(pan 2.7배 · zoom 3배) alternate_zoom으로 씬마다 줌인/줌아웃을 번갈아 걸어 체감 움직임을 늘린다. 원본 씬이 1376x768이고 캔버스가 1920x1080이라 기본 업스케일이 1.4배 — zoom_end를 1.45보다 올리면 선이 뭉개진다. 되돌리려면 이 블록을 지우면 코드 기본값으로 돌아간다.",
+      "movement_range": 0.08,
+      "zoom_start": 1.2,
+      "zoom_end": 1.45,
+      "alternate_zoom": true,
+      "pan_per_sec": 0.012,
+      "_comment_pan_per_sec": "★초당 이동량(정규화 단위/초). 2026-08-29 사용자 지시로 신설 — 종전에는 씬 길이와 무관하게 -movement_range → +movement_range 를 한 번에 훑어서, 짧은 씬은 빠르고 긴 씬은 느렸다. 08편 실측 9.5초 씬 0.0169/s vs 105초 씬 0.0015/s 로 11배 차이. 이제 이 값으로 속도를 고정하고 씬이 길면 왕복시킨다(진폭은 movement_range 그대로 — 줌이 덮는 만큼만 움직일 수 있어 진폭을 늘리면 가장자리가 드러난다). 왕복 반주기 = 2×movement_range ÷ pan_per_sec. 0.008(=20초 주기)로 한 번 맞췄다가 2026-08-29 사용자 지시로 0.012(=13.3초 주기)로 올렸다 — \"많이 움직여야 한다\". 이 키를 지우면 종전(한 번에 훑기) 동작으로 돌아간다."
     }
   }
 }

@@ -7,6 +7,11 @@
   },
   "channels": [
     {
+      "handle": "@story_dawn",
+      "name": "이야기 들려주는 새벽",
+      "note": "★playbook v3.0~v4.0 1번 벤치마크(refs/001·005) · 사용자 지정 BM 2026-09-03 · 구독 7만 · 좋아요율 1.06%"
+    },
+    {
       "url": "https://www.youtube.com/channel/UCJiePgRTXdUHMFIr577IB6g",
       "name": "야담집",
       "note": "트렌디 · 구독 88,300 (2026-06 기준)"

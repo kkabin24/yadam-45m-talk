@@ -1,0 +1,30 @@
+{
+  "approved_file": "intro_ver3_bgm_sub.mp4",
+  "approved_note": "★기록용이다. attach_intro.py 는 이 값이 아니라 코드 상수 DEFAULT_INTRO 를 본다(2026-08-29 사용자 지시) — 이 파일이 재빌드마다 덮어써져 approved_file 이 날아갔기 때문. 승인본을 바꾸려면 attach_intro.py 의 DEFAULT_INTRO 를 고친다. 빌드 내력은 intro_ver3.json 참조.",
+  "method": "clip1 구간 조립 — 말 구간은 긴 연속 재생, 쉼 구간은 입 다문 구간",
+  "duration": 11.267,
+  "audio": "intro_ver3.mp3",
+  "audio_duration": 11.256,
+  "source": "clip1.mp4",
+  "fps": 30,
+  "jumps": 0,
+  "reverse_frames": 98,
+  "talk_pool_sec": [0.0, 5.5],
+  "silent_pool_sec": [5.27, 6.5],
+  "open_mean": {
+    "speech": 0.108,
+    "silence": 0.057
+  },
+  "params": {
+    "sil_db": -25.0,
+    "min_sil": 0.5,
+    "keep_head": 2.54,
+    "talk_pct": 10,
+    "sil_release": 0.25,
+    "sil_jump": false,
+    "closed_pct": 35.0,
+    "mouth_box": [895, 450, 1040, 555]
+  },
+  "why": "프레임 단위 재배열은 립싱크는 좋지만 점프가 잦아 머리가 떨렸다. 구간 단위로 길게 붙이면 움직임이 자연스럽고, 쉼 구간에만 입을 닫으면 충분하다(사용자 지시 2026-08-14).",
+  "note": "★build_intro_retime.py 는 실행할 때마다 이 파일을 덮어써서 approved_file 을 날린다. 재빌드 뒤에는 approved_file 을 다시 넣을 것."
+}

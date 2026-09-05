@@ -1,0 +1,53 @@
+{
+  "build": "intro_ver2 — BGM 버전 (2026-08-29, 나레이션 교체 재빌드)",
+  "outputs": {
+    "intro_ver2_video.mp4": "나레이션만 얹은 중간본 (BGM 없음)",
+    "intro_ver2_bgm.mp4": "자막 없는 마스터 (승인본 자리)",
+    "intro_ver2_bgm_sub.mp4": "자막 번인본 — attach_intro.py 가 쓰는 승인본(intro.json approved_file)"
+  },
+  "duration": 11.233,
+  "fps": 30,
+  "sources": {
+    "audio": "intro_ver2.mp3 (11.232초, -12.1 LUFS) — 2026-08-29 18:15 사용자 교체본",
+    "subtitle": "intro_ver2.srt (4큐, 끝 11.220초) — 같이 교체됨",
+    "video_pool": "clip1.mp4 ← Desktop/★Youtube_부업/1.유튜브채널 프로필/intro_final.mp4 복원본",
+    "bgm": "bgm_stem.mp3 — intro_ver2 최초 빌드에서 선형 감산으로 복원한 스템(아래 참조)"
+  },
+  "narration_change": {
+    "what": "대사 한 줄이 빠지고 호흡이 느려졌다. 옛: 안녕하세요 / 옛뜰이예요 오늘도 정말 고생 많으셨어요 / 오늘 밤도 편안하시길 바라며, / 구독과 좋아요를 먼저 눌러주시면, 제게 정말 큰 힘이 됩니다 (10.944초). 새: 안녕하세요 / 오늘 밤도 편안하시길 바라며, / 구독과 좋아요를 먼저 눌러주시면, / 제게 정말 큰 힘이 됩니다 (11.232초).",
+    "impact": "줄이 하나 줄었는데 길이는 0.29초 늘었다 — 쉼이 길어져 입을 다물고 있어야 하는 구간이 1.43초로 커졌다."
+  },
+  "restore_note": "★리포지토리에서 사라졌던 인트로 원본을 되살렸다. 종전 빌드 입력(clip1.mp4·BGM 스템)이 assets/intro/ 에 없어 재빌드가 불가능했다. 자막이 구워진 intro_bgm_D 는 소스로 쓸 수 없다(하단 밴드에 옛 자막이 10.56초 내내 박혀 있다 — 실측). 자막 없는 intro_final.mp4 를 Desktop 프로필 폴더에서 찾아 clip1.mp4 로 되돌려 놓았다.",
+  "bgm_recovery": {
+    "method": "선형 감산 — intro_bgm_D(믹스) − g·intro_final(나레이션만) = BGM",
+    "lag_samples": 239,
+    "gain": 0.7042,
+    "gain_db": -3.05,
+    "residual_rms": 1209,
+    "mix_rms": 3871,
+    "validation": "잔차 레벨이 말 구간 57.7 dB / 쉼 구간 59.1 dB — 말할 때 오히려 1.4 dB 낮다. 나레이션 잔향이 남았다면 반대로 높아야 하므로 감산이 깨끗하다는 증거(옛 더킹 흔적 -1.4 dB는 그대로 남음).",
+    "caveat": "두 mp4가 각각 AAC로 인코딩돼 있어 코덱 양자화 잡음이 미세하게 섞인다. 실측상 BGM 레벨보다 낮아 들리지 않는다. 원본 BGM 파일이 나오면 그걸로 교체하는 편이 낫다."
+  },
+  "video": {
+    "method": "build_intro_retime.py 구간 조립 — 말 구간은 긴 연속 재생, 끝 쉼 구간은 입을 닫는다",
+    "params": {"keep_head": 2.57, "talk_pct": 10},
+    "keep_head_why": "새 첫 큐 '안녕하세요'가 2.57초에 끝난다(옛 ver2는 1.95초). 그 자리까지는 clip1을 자르지 않고 원본 그대로 쓴다.",
+    "talk_pct_why": "★사용자 요구 '끊기는 느낌 없게 · 원래 영상을 최대한 그대로'. 10/15/20/30을 실측 비교했더니 10에서만 말하는 풀이 0.00~5.50초로 잡혀 도입부와 이어지고 **점프가 0회**가 된다(나머지는 전부 1회). 끝 쉼 구간 입 벌림도 0.056으로 가장 잘 닫힌다(20→0.101, 30→0.118). 대가는 말 구간 벌림이 0.133→0.108로 조금 얌전해지는 것인데, 이 인트로의 우선순위는 립싱크 정확도가 아니라 컷 없는 움직임이다(2026-08-14 사용자 지시).",
+    "jumps": 0,
+    "reverse_pct": 29,
+    "open_mean": {"speech": 0.108, "silence": 0.056},
+    "mouth_box": [895, 450, 1040, 555]
+  },
+  "audio_mix": {
+    "narration_gain": 0.6269,
+    "breakdown": "라우드니스 정합 0.8902 (새 ver2 -12.1 → 옛 나레이션 -13.11 LUFS) × '나레이션더작게' 계수 0.7042",
+    "bgm_atempo": 0.942071,
+    "bgm_atempo_why": "BGM 스템 10.581초 → 11.232초. 피치 보존 스트레치 5.8%로 앰비언트에서는 들리지 않고, 옛 BGM의 끝 페이드가 새 나레이션 끝자락에 그대로 걸린다(옛 ver2는 3.2%였다).",
+    "result_lufs": -16.1,
+    "old_mix_lufs": -16.03,
+    "peak_db": -4.4,
+    "command": "ffmpeg -i intro_ver2_video.mp4 -i intro_ver2.mp3 -i bgm_stem.mp3 -filter_complex \"[1:a]volume=0.6269[n];[2:a]atempo=0.942071[b];[n][b]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]\" -map 0:v:0 -map [a] -c:v copy -c:a aac -b:a 192k -ar 48000 -ac 2 -movflags +faststart -t 11.232"
+  },
+  "subtitle_style": "burn_intro_subs.py — Malgun Gothic Bold / 글자 108px / 외곽선 9px (settings.capcut.subtitle 환산)",
+  "prev": "_prev/ 에 교체 전 나레이션·자막과 옛 완성본 2개를 남겨 뒀다."
+}
