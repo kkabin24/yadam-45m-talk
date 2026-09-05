@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """채널 고정 인트로 클립 제작 (1회성 자산 — SKILL.md INTRO 절).
 
-마스코트가 인사하는 립싱크 영상을 Veo로 만들고, **사용자가 녹음한 음성**을 얹는다.
-Veo는 최대 8초라 오디오가 8초를 넘으면 클립을 이어붙인다
+마스코트가 인사하는 립싱크 영상을 PJN(로컬 5090 MiniMax H3, 무료)으로 만들고,
+**사용자가 녹음한 음성**을 얹는다. ★Gemini 영상 생성은 영구 차단(video_engine_policy.py).
+클립은 최대 8초라 오디오가 8초를 넘으면 이어붙인다
 (2번째 클립의 시작 프레임 = 1번째 클립의 마지막 프레임 → 연속성 유지).
 
 사용법:
-    python3 scripts/render/build_intro.py --channel yadam --stage clip1     # ⚠️유료
-    python3 scripts/render/build_intro.py --channel yadam --stage clip2     # ⚠️유료
+    python3 scripts/render/build_intro.py --channel yadam --stage clip1     # 무료(PJN)
+    python3 scripts/render/build_intro.py --channel yadam --stage clip2     # 무료(PJN)
     python3 scripts/render/build_intro.py --channel yadam --stage assemble  # 무료
 
 자산: channels/{채널}/assets/intro/
@@ -18,7 +19,10 @@ import argparse, json, os, pathlib, subprocess, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "render"))
-from veo_hook import veo_gemini, find_env_key  # noqa: E402
+# ★2026-09-06 — 인트로 클립도 PJN(무료·PJN_API_KEY)으로 만든다.
+#   veo_gemini 는 video_engine_policy 에 의해 영구 차단됐다(호출하면 즉시 죽는다).
+from veo_hook import veo_pjn, find_env_key  # noqa: E402
+from video_engine_policy import assert_video_engine, assert_video_key  # noqa: E402
 
 # ★대사를 프롬프트에 넣지 않는다 (2026-08-14 실측)
 # 따옴표 대사를 주면 Veo가 그 말을 **깨진 한글 자막으로 화면에 구워 넣는다**
@@ -73,15 +77,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--channel", default="yadam")
     ap.add_argument("--stage", required=True, choices=["clip1", "clip2", "assemble"])
-    ap.add_argument("--model", default="veo-3.1-fast-generate-preview",
-                    help="Fast=립싱크 정확 / Lite=저렴(veo-3.1-lite-generate-preview)")
+    ap.add_argument("--quality", type=float, default=1.0, choices=[0.4, 0.6, 0.8, 1.0],
+                    help="PJN 화질 (1.0=1376x768)")
     ap.add_argument("--frame", default="draft_ref_v1.png")
     ap.add_argument("--audio", default="인트로.mp3")
-    ap.add_argument("--resolution", default="1080p")
-    ap.add_argument("--no-negative", action="store_true",
-                    help="negativePrompt 생략. ★Lite 모델은 이 파라미터를 거부한다(API 400, 2026-08-14 실측)")
-    ap.add_argument("--seconds", type=int, default=None,
-                    help="클립 길이 강제. ★1080p는 4초를 거부한다(API 400) — 6초 또는 8초를 쓸 것")
+    ap.add_argument("--seconds", type=int, default=None, help="클립 길이 강제 (4/6/8초)")
     args = ap.parse_args()
 
     D = ROOT / "channels" / args.channel / "assets" / "intro"
@@ -92,9 +92,11 @@ def main():
 
     if args.stage in ("clip1", "clip2"):
         use_certifi_ssl()
-        key = find_env_key(D, "GEMINI_API", "GEMINI_API_KEY", "GOOGLE_API_KEY")
+        engine = assert_video_engine("pjn", "build_intro")   # ★정책 관문 1겹
+        key = find_env_key(D, "PJN_API_KEY")
         if not key:
-            raise SystemExit("GEMINI_API_KEY 없음 (.env)")
+            raise SystemExit("PJN_API_KEY 없음 (.env)")
+        assert_video_key(key, engine, "build_intro")         # ★정책 관문 3겹
         n = 1 if args.stage == "clip1" else 2
         out = D / f"clip{n}.mp4"
         if n == 1:
@@ -113,11 +115,10 @@ def main():
             secs = args.seconds or (6 if need <= 6 else 8)
             print(f"  남은 오디오 {need:.2f}초 → 클립2 {secs}초 (초과분은 assemble에서 트림)")
         prompt = PROMPT.format(beat=BEAT[n])
-        print(f"⚠️ Veo 생성 (유료): {args.model} {secs}s {args.resolution} ← {frame.name}")
-        rc = veo_gemini(prompt, frame, out, key, args.model, "16:9", args.resolution, secs,
-                        negative_prompt=None if args.no_negative else NEGATIVE)
+        print(f"PJN 생성 (무료, minimax-h3): {secs}s q{args.quality} ← {frame.name}")
+        rc = veo_pjn(prompt, frame, out, key, "16:9", args.quality, secs)
         if rc:
-            raise SystemExit("Veo 생성 실패")
+            raise SystemExit("PJN 생성 실패")
         print(f"✓ {out.name}  {dur(out):.2f}초")
         return 0
 
@@ -159,8 +160,9 @@ def main():
 
     meta = {"duration": round(dur(out), 3), "audio": args.audio, "audio_duration": round(a_dur, 3),
             "clips": [c.name for c in clips], "clip_seconds": [round(dur(c), 2) for c in clips],
-            "start_frame": args.frame, "model": args.model, "resolution": args.resolution,
-            "dialogue_in_audio": "인트로.srt 참조 (Veo 프롬프트에는 대사를 넣지 않는다 — 자막 구워짐 방지)",
+            "start_frame": args.frame, "engine": "pjn", "model": "minimax-h3",
+            "quality": args.quality,
+            "dialogue_in_audio": "인트로.srt 참조 (프롬프트에는 대사를 넣지 않는다 — 자막 구워짐 방지)",
             "note": "자막 없음 — CapCut에서 입힌다. 매 편 CapCut export 뒤 ffmpeg concat으로 앞에 붙일 것."}
     (D / "intro.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"✓ {out}  {meta['duration']}초")

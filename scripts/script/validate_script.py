@@ -99,7 +99,13 @@ SEUB_PAIR_CEIL = 5.0       # 2연속 시작 지점이 문장 수의 5% 이하
 # 대사 '비율'은 이미 재고 있었는데(2.5~4%) 08편은 3.1%로 밴드 안이면서
 # 2편에 11.5분짜리 무대사 구간이 있었다. 어미 연속과 같은 사각지대 —
 # 비율은 맞고 분포가 무너진 경우다. 그래서 '몇 개'가 아니라 '얼마나 비었나'를 잰다.
-DIALOGUE_GAP_CEIL = 5.0    # 분. 대사와 대사 사이가 이보다 길면 걸린다
+DIALOGUE_GAP_CEIL = 5.0    # 분. 대사와 대사 사이가 이보다 길면 걸린다 (단일 나레이션)
+
+# ★2026-09-06 — 대사클립 모드(voice="clip"). 2분마다 대사 구간 하나를 PJN i2v 클립으로 만든다.
+# 그래서 공백 상한이 문체 기준이 아니라 **렌더 파이프라인의 입력 요구사항**이 된다:
+# 대본이 4분을 비워 놓으면 그 자리에 꽂을 클립이 없다. script-guide §5-7 참조.
+DIALOGUE_GAP_CEIL_CLIP = 2.0
+CLIP_INTERVAL_MIN = 2.0    # 클립 간격(분) — 편당 클립 자리 수 = 러닝타임 / 이 값
 
 
 def _repeat_load(window):
@@ -232,6 +238,12 @@ def dialogue_gap(text, cpm=DEFAULT_CPM):
 def style_report(text, voice="single", cpm=DEFAULT_CPM):
     """script-guide §5 문체 수치표 대조. 반환: 목표 범위를 벗어난 항목 리스트(경고용).
 
+    voice="clip"  : ★대사클립 모드(2026-09-06 신설, 야담 현행 기본) — 직접대사 25~30%.
+                    대사 구간을 PJN i2v 립싱크 클립으로 만들어 **인물이 제 목소리로** 말한다.
+                    단일 나레이션의 2.5~4%는 "한 사람이 다 읽어 톤이 무너진다"가 유일한 근거였고,
+                    클립이 읽으면 그 근거가 사라진다. 벤치 ③(kfZGIhXRXK4) 실측 50.7%와
+                    단일 나레이션 4% 사이에서, 클립이 흡수하는 몫만큼만 올린 값.
+                    공백 상한도 5분 → 2분으로 함께 내려간다.
     voice="single": 단일 나레이션 — 직접대사 상한 3.5% / 편당 여덟아홉 줄
                     (2026-08-15 v3.0c에서 2.5%로 내렸다가, 같은 날 v3.0d에서 되올림 —
                      6줄로는 ④부탁 장면이 간접화법 나열로 무너진다는 것이 실집필에서 확인됨)
@@ -247,7 +259,8 @@ def style_report(text, voice="single", cpm=DEFAULT_CPM):
     pct_long = sum(1 for x in lens if x > 40) / n * 100
     dialogue = sum(1 for s in sents if s.lstrip().startswith(('"', '“')) or '"' in s or '“' in s) / n * 100
 
-    dlg_lo, dlg_hi = (15, 30) if voice == "multi" else (2.5, 4)
+    dlg_lo, dlg_hi = {"clip": (25, 30), "multi": (15, 30)}.get(voice, (2.5, 4))
+    gap_ceil = DIALOGUE_GAP_CEIL_CLIP if voice == "clip" else DIALOGUE_GAP_CEIL
     nospace = no_space_len(text)
     mimetic = len(MIMETIC_RE.findall(text)) * 10000 / max(1, nospace)
     rows = [
@@ -264,7 +277,18 @@ def style_report(text, voice="single", cpm=DEFAULT_CPM):
         rows.append((f"{label} 종결", hits / n * 100, lo, hi, "%"))
     _runs, _ns = seub_runs(text)
     rows.append(("같은 어미 2연속", len(_runs) / max(1, _ns) * 100, 0, SEUB_PAIR_CEIL, "%"))
-    rows.append(("대사 최장 공백(분)", dialogue_gap(text, cpm), 0, DIALOGUE_GAP_CEIL, "분"))
+    rows.append(("대사 최장 공백(분)", dialogue_gap(text, cpm), 0, gap_ceil, "분"))
+    if voice == "clip":
+        # 클립 자리 수 — 러닝타임을 2분으로 나눈 값만큼 대사 '덩어리'가 필요하다.
+        runtime = no_space_len(text) / max(1, cpm)
+        need = max(1, int(runtime / CLIP_INTERVAL_MIN))
+        blocks, run = 0, False
+        for s_ in sents:
+            has = ('"' in s_ or '“' in s_)
+            if has and not run:
+                blocks += 1
+            run = has
+        rows.append((f"대사 덩어리 수(≥{need}개 필요)", blocks, need, 999, "개"))
 
     long_n, risky = reading_split_risk(sents)
     print(f"\n[낭독 분할] 40자 초과 서술문 {long_n}개 — Vrew가 약 30%를 두 클립으로 나눠 읽는다")
@@ -387,8 +411,9 @@ if __name__ == "__main__":
                         help=f"낭독 속도 (공백 제외 자/분, 기본 {DEFAULT_CPM}) — 분 환산에만 사용")
     parser.add_argument("--style", action="store_true",
                         help="문체 수치 검사 (script-guide §5 목표치 대조, 경고만)")
-    parser.add_argument("--voice", choices=("single", "multi"), default="single",
-                        help="낭독 보이스 정책 — single(기본, 직접대사 3.5%% 상한) | multi(20%% 안팎). --style에만 영향")
+    parser.add_argument("--voice", choices=("clip", "single", "multi"), default="clip",
+                        help="낭독 보이스 정책 — clip(★기본, 대사클립 모드 25~30%%·공백 2분) | "
+                             "single(단일 나레이션 2.5~4%%·공백 5분) | multi(20%% 안팎). --style에만 영향")
     args = parser.parse_args()
 
     ok_all, grand_total = True, 0

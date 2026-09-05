@@ -5,11 +5,12 @@ VEO_HOOK — 훅 인트로 립싱크 클립 자동화 (SCENE_TIMING 후, RENDER 
 씬1 이미지를 시작 프레임으로 Veo i2v 8초 립싱크 클립을 생성하고,
 렌더 storyboard(`{V}/storyboard.json`) 씬1에 `video_path`를 주입한다.
 
-엔진 (settings.json image.veo.engine, 기본 gemini):
-  - gemini: Gemini API predictLongRunning (⚠️유료, GEMINI_API_KEY — 데몬 불필요, 기본)
-            모델 기본 veo-3.1-fast-generate-preview, 1080p, 8초, 네이티브 오디오(대사 포함)
+엔진 (settings.json image.veo.engine, 기본 pjn):
+  - pjn:    로컬 5090 서버 api.project-n.work (무료, PJN_API_KEY — MiniMax H3 i2v, 오디오 포함) ★기본
   - flow:   labs.google 웹세션 (flow_veo.py — 데몬 :포트 + Chrome 로그인 필요, ~20크레딧/8초)
-  - pjn:    로컬 5090 서버 api.project-n.work (무료, PJN_API_KEY — MiniMax H3 i2v, 오디오 포함)
+  - ~~gemini~~: ★영구 차단. GEMINI_API_KEY로는 영상을 만들지 않는다
+            (video_engine_policy.py — 엔진명·함수진입·키모양 3겹 차단.
+             Gemini 키는 '이미지' 생성 전용이며 그 경로는 그대로 쓴다)
             최대 1376x768 · 대사는 H3 태그 형식 별도 프롬프트(veo_hook_prompt_pjn.txt) 사용
             첫 프레임을 입력 이미지에 픽셀 고정(스틸→클립 컷 연결이 Veo보다 자연스러움)
 
@@ -25,7 +26,7 @@ VEO_HOOK — 훅 인트로 립싱크 클립 자동화 (SCENE_TIMING 후, RENDER 
 
 Usage:
     python3 scripts/render/veo_hook.py <project_dir> [--prompt-only] [--force]
-        [--engine gemini|flow|pjn] [--model MODEL] [--duration 8] [--config settings.json]
+        [--engine pjn|flow] [--model MODEL] [--duration 8] [--config settings.json]
 """
 import argparse
 import base64
@@ -41,6 +42,12 @@ import urllib.request
 SCRIPTS = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS / "image"))
 from generate_image import find_env_key, ssl_context  # noqa: E402
+
+# ★영상 엔진 정책 — Gemini 영상 생성 영구 차단 (video_engine_policy.py 참조).
+#   폴백 금지: VideoEnginePolicyError 를 잡아서 다른 엔진으로 넘기지 말 것.
+from video_engine_policy import (  # noqa: E402
+    assert_no_gemini_video, assert_video_key, video_engine_from_settings,
+)
 
 # ★Windows 인증서 저장소 우회 (2026-08-26). 이 PC는 ROOT 저장소에 ASN1이 깨진 항목이 있어
 # ssl.create_default_context()가 [ASN1: NOT_ENOUGH_DATA]로 죽는다 — urlopen이 전량 실패한다.
@@ -376,7 +383,7 @@ def inject_video_path(video_dir: pathlib.Path) -> bool:
     return True
 
 
-# ---------------- gemini(Veo API) 백엔드 ----------------
+# ---------------- gemini(Veo API) 백엔드 — ★영구 차단(호출 불가) ----------------
 
 def _api(url: str, key: str, body: dict | None = None, timeout: int = 120) -> dict:
     req = urllib.request.Request(
@@ -394,9 +401,14 @@ def veo_gemini(prompt: str, frame: pathlib.Path, out_path: pathlib.Path, key: st
                negative_prompt: str | None = None) -> int:
     """Gemini API Veo i2v: predictLongRunning → 폴링 → URI 다운로드. 성공 0.
 
-    negative_prompt: 선택. ★자막 구워짐 방지에 필요하다 — 프롬프트에 따옴표 대사를 넣으면
+    ★2026-09-06 — 이 함수는 더 이상 호출되지 않는다. 첫 줄에서 정책 위반으로 죽는다.
+    영상은 PJN(veo_pjn)만 쓴다. 아래 구현은 이력 보존용으로 남겨 둘 뿐이며,
+    되살리려면 video_engine_policy.py 의 불변 규칙을 먼저 바꿔야 한다.
+
+    negative_prompt: 선택. ★자막 구워짐 방지에 필요했다 — 프롬프트에 따옴표 대사를 넣으면
     Veo가 그 대사를 **깨진 한글 자막으로 화면에 렌더링**한다(2026-08-14 인트로 실측).
     """
+    assert_no_gemini_video("veo_hook.veo_gemini")   # ★여기서 끝. 아래로 내려가지 않는다.
     b64 = base64.b64encode(frame.read_bytes()).decode()
     mime = "image/png" if frame.suffix.lower() == ".png" else "image/jpeg"
     # durationSeconds는 정수여야 한다(문자열이면 400) — 2026-07-19 실측
@@ -538,11 +550,12 @@ def main() -> int:
                     help="settings.json 경로 (기본: {P}/../../config/settings.json)")
     ap.add_argument("--prompt-only", action="store_true", help="무료: 프롬프트·매니페스트만 생성")
     ap.add_argument("--force", action="store_true", help="mp4가 있어도 재생성 (⚠️과금 재발생)")
-    ap.add_argument("--engine", default=None, choices=["gemini", "flow", "pjn"],
-                    help="기본: settings image.veo.engine → gemini. pjn=로컬 5090 서버(무료)")
+    ap.add_argument("--engine", default=None, choices=["pjn", "flow"],
+                    help="기본: settings image.veo.engine → pjn(로컬 5090 서버·무료). "
+                         "★gemini 는 선택지에 없다 — 영상 생성 영구 차단")
     ap.add_argument("--model", default=None)
-    ap.add_argument("--duration", type=int, default=8, choices=[4, 6, 8], help="gemini 전용 (기본 8초)")
-    ap.add_argument("--resolution", default=None, help="gemini 전용 (기본 settings → 1080p)")
+    ap.add_argument("--duration", type=int, default=8, choices=[4, 6, 8], help="클립 길이 (기본 8초)")
+    ap.add_argument("--resolution", default=None, help="(구 gemini 전용 — 현재 미사용)")
     ap.add_argument("--ports", default=None, help="flow 전용: 유료 레인 포트(쉼표구분)")
     ap.add_argument("--video-subdir", default="_video")
     ap.add_argument("--no-conform", action="store_true",
@@ -587,15 +600,14 @@ def main() -> int:
         settings = json.loads(cfg_path.read_text(encoding="utf-8"))
     veo_cfg = (settings.get("image") or {}).get("veo") or {}
     render_cfg = settings.get("render") or {}
-    engine = args.engine or veo_cfg.get("engine") or "gemini"
+    # ★정책 관문 1겹 — settings 나 --engine 에 gemini 가 들어 있으면 여기서 즉시 죽는다.
+    engine = video_engine_from_settings(veo_cfg, args.engine, "veo_hook")
     ratio = veo_cfg.get("ratio") or "16:9"
     resolution = args.resolution or veo_cfg.get("resolution") or "1080p"
     flow_cfg = veo_cfg.get("flow") or {}
     pjn_cfg = veo_cfg.get("pjn") or {}
     pjn_quality = float(pjn_cfg.get("quality") or 1.0)  # 0.4/0.6/0.8/1.0 (1.0→1376x768)
-    if engine == "gemini":
-        model = args.model or veo_cfg.get("model") or "veo-3.1-fast-generate-preview"
-    elif engine == "pjn":
+    if engine == "pjn":
         model = "minimax-h3"
     else:
         model = args.model or flow_cfg.get("model") or "veo-fast"
@@ -654,9 +666,7 @@ def main() -> int:
 
     # 3) 매니페스트 (항상 기록 — 수동 폴백의 근거 파일)
     out_path = V / out_name
-    if engine == "gemini":
-        manual = f"python3 scripts/render/veo_hook.py '{P}' --force --engine gemini --model {model}"
-    elif engine == "pjn":
+    if engine == "pjn":
         manual = f"python3 scripts/render/veo_hook.py '{P}' --force --engine pjn"
     else:
         manual = (f"python3 scripts/image/flow_veo.py '{V / PROMPT_NAME}' '{out_path}' "
@@ -667,9 +677,8 @@ def main() -> int:
         "prompt_file": prompt_name,
         "dialogue": dialogue,
         "model": model, "ratio": ratio,
-        "resolution": (resolution if engine == "gemini"
-                       else f"quality={pjn_quality}" if engine == "pjn" else None),
-        "duration": args.duration if engine in ("gemini", "pjn") else 8,
+        "resolution": (f"quality={pjn_quality}" if engine == "pjn" else None),
+        "duration": args.duration if engine == "pjn" else 8,
         "output": out_name,
         "story": args.story,
         "manual_cmd": manual,
@@ -694,20 +703,14 @@ def main() -> int:
         print(f"클립 존재 — 생성 건너뜀: {out_path}")
     else:
         prompt = prompt_path.read_text(encoding="utf-8")
-        if engine == "gemini":
-            key = find_env_key(P, "GEMINI_API", "GEMINI_API_KEY", "GOOGLE_API_KEY")
-            if not key:
-                save("failed")
-                print("error: GEMINI_API_KEY 없음 (.env) — 매니페스트의 manual_cmd로 재시도.", file=sys.stderr)
-                return 1
-            print(f"⚠️ Veo 생성 시작 (유료 API, {model}, {args.duration}s, {resolution})")
-            rc = veo_gemini(prompt, frame, out_path, key, model, ratio, resolution, args.duration)
-        elif engine == "pjn":
+        if engine == "pjn":
             key = find_env_key(P, "PJN_API_KEY")
             if not key:
                 save("failed")
                 print("error: PJN_API_KEY 없음 (.env) — 매니페스트의 manual_cmd로 재시도.", file=sys.stderr)
                 return 1
+            # ★정책 관문 3겹 — .env 에 PJN_API_KEY 자리에 Google 키가 들어가 있어도 여기서 죽는다.
+            assert_video_key(key, engine, "veo_hook")
             print(f"로컬 5090 생성 시작 (무료, minimax-h3, {args.duration}s, q{pjn_quality})")
             rc = veo_pjn(prompt, frame, out_path, key, ratio, pjn_quality, args.duration)
         else:
