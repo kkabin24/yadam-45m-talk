@@ -176,7 +176,32 @@ python3 scripts/render/attach_intro.py "<완성본.mp4>" --project {P} --write-m
 | SCAN·CONCEPT·OUTLINE | script-guide.md |
 | DRAFT | script-guide.md + script-constraints.md |
 | REVIEW | script-constraints.md |
+| **리뷰 게이트 G1~G5 (★2026-09-06 신설)** | **review-gates.md** |
 | (딥 벤치마킹 시에만) | benchmark-guide.md (+playbook-history.md) |
+
+### ★리뷰 게이트 — 단계마다 서브에이전트에게 검수받는다 (2026-09-06 신설 · 사용자 지시)
+
+**완성 대본에만 리뷰를 붙이면 고칠 수 있는 것이 문장뿐이다.** 소재가 약하거나 골격이 평평하면
+그때는 12,700자를 다시 써야 하므로 아무도 그 지적을 반영하지 않는다. 그래서 **되돌리는 비용이 싼 자리에서** 묻는다.
+
+| 게이트 | 자리 | 넘기는 것 |
+|---|---|---|
+| **G1** | CONCEPT 확정 직후 | concept.md — 클릭될 소재인가 |
+| **G2** | OUTLINE 확정 직후 | outline.md — 45분치 계단이 있는가 |
+| **G3** | 편 초고 첫 3분을 쓴 직후 | 첫 850자 — **★이탈이 몰리는 자리, 가장 싸고 가장 세다** |
+| **G4** | 편 초고 완성 직후 | 편 전문 — 어디서 끄고 싶어지는가 |
+| **G5** | POLISH 후 | script.txt — 남은 위화감 |
+
+```
+python3 scripts/script/review_gate.py g3 {S}/chapters/01.md --out {S}/_review/g3_packet.md
+#  → 기계 검사 수치 + 그 단계가 볼 분량 + 리뷰어 페르소나·판정표(A~E)를 한 봉투로 싼다
+#  → 그 패킷을 그대로 서브에이전트에 넘기고, 받은 답을 {S}/review_NN.md에 적는다
+```
+
+- **판정이 반려면 다음 단계로 넘어가지 않는다.**
+- **반영은 우선순위 셋까지만.** 다 고치면 문장이 평평해진다(§5 밴드).
+- **리뷰어에게 집필 의도를 주지 않는다** — 의도를 알면 의도대로 읽어 준다.
+- 판정 기준·출력 서식·반영 규칙은 `prompts/review-gates.md`. 조회수(A) / 초반이탈(B) / 중반(C) / 후반(D) / 채널고유(E).
 
 서브 상태 감지 (위→아래 첫 매칭):
 ```
