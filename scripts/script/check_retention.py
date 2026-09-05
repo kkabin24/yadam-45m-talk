@@ -101,6 +101,20 @@ def analyse(text, cpm):
     head = " ".join(s for st, _, s in tl if st < OPEN_MIN)
     r["H3"] = dialogue_blocks(head)
 
+    # H4 도입 3분 안의 최장 공백 (★2026-09-06 G3 리뷰 반영)
+    # R1(편 전체 2.0분)만 보면 도입이 통과한다 — 그런데 리뷰어가 짚은 실제 이탈 자리는
+    # 1분41초~2분33초의 52초였다. 0.87분이라 R1은 걸지 않는다.
+    # 도입은 시청자가 아직 이야기에 붙지 않은 구간이라 같은 공백도 훨씬 길게 느껴진다.
+    g = b = 0.0
+    for st, en, s_ in tl:
+        if st >= OPEN_MIN:
+            break
+        if QUOTE.search(s_):
+            b, g = max(b, g), 0.0
+        else:
+            g += en - st
+    r["H4"] = max(b, g)
+
     # R1 대사 최장 공백
     gap = best = 0.0
     for st, en, s in tl:
@@ -156,6 +170,7 @@ LIMITS = {
     "H1": ("훅 — 첫 문장에 대사",        lambda v: v is True,        "있음/없음"),
     "H2": ("첫 사건 착수 문장",          lambda v: v is not None and v <= 7, "≤7번째"),
     "H3": ("도입 3분 대사 덩어리",       lambda v: v >= 3,           "≥3개"),
+    "H4": ("도입 3분 최장 공백(분)",     lambda v: v <= 0.7,         "≤0.7분"),
     "R1": ("대사 최장 공백(분)",         lambda v: v <= 2.0,         "≤2.0분"),
     "R2": ("죽은 창(대사0+전환0)",       lambda v: len(v) == 0,      "0개"),
     "R3": ("설명 문단 최장 연속",        lambda v: v <= 2,           "≤2개"),
