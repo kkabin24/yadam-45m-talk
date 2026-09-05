@@ -14,11 +14,39 @@ from datetime import datetime
 import subprocess
 
 
-def load_settings(config_path):
-    """settings.json에서 설정 로드"""
+def find_channel_config(start, name="settings.json"):
+    """start에서 위로 올라가며 config/<name>을 찾는다 (build.py·generate_image.py와 같은 방식).
+    ★프로젝트 깊이를 가정하지 않는다 — 옴니버스는 projects/09편/_video/ 처럼 한 겹 더 낀다."""
+    cur = Path(start).resolve()
+    for _ in range(6):
+        p = cur / "config" / name
+        if p.exists():
+            return p
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return None
+
+
+def load_settings(config_path, start=None):
+    """settings.json에서 설정 로드.
+
+    ★2026-08-29 자동 탐색 신설 — 종전에는 --config 를 안 주면 **빈 설정으로 조용히 돌아**
+      코드 기본값이 쓰였다(자막 font_size 10.0 → 5.0, 켄번스 pan_per_sec 0.012 무시).
+      실패가 눈에 안 보여서 드래프트를 다 만든 뒤에야 발견된다. 그래서 --config 가 없으면
+      output_dir 에서 위로 올라가며 config/settings.json 을 찾는다. 다른 스크립트와 같은 동작이다.
+    """
     if config_path and Path(config_path).exists():
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)
+    if start:
+        found = find_channel_config(start)
+        if found:
+            print(f"설정 자동 탐색: {found}")
+            with open(found, "r", encoding="utf-8") as f:
+                return json.load(f)
+        print("⚠ config/settings.json 을 찾지 못했습니다 — 코드 기본값으로 진행합니다"
+              " (자막 font_size 5.0 · 켄번스 옛 동작)")
     return {}
 
 
@@ -631,8 +659,44 @@ def create_ken_burns_keyframes(duration_us, scene_index, ken_burns_config=None):
     start_scale = max(cfg.get("zoom_start", 1.05), min_start_scale)
     end_scale = max(cfg.get("zoom_end", 1.15), min_start_scale)
 
+    # ★씬마다 줌인/줌아웃을 번갈아 건다 (2026-08-26 사용자 지시 "훨씬 더 많이 움직이게").
+    # 전부 줌인이면 진폭을 키울수록 끝 배율만 계속 커져 화질이 상한에 걸린다.
+    # 홀수 씬을 뒤집으면 같은 진폭으로 체감 변화량이 두 배가 되고 평균 배율은 그대로다.
+    if cfg.get("alternate_zoom") and scene_index % 2 == 1:
+        start_scale, end_scale = end_scale, start_scale
+
     # 끝 시간 (약간 여유)
     end_time = int(duration_us * 0.99)
+
+    # ★초당 이동량을 씬마다 같게 한다 (2026-08-29 사용자 지시).
+    #   종전에는 씬 길이와 무관하게 -mr → +mr 을 **한 번에** 훑었다. 그래서 짧은 씬은 빠르고
+    #   긴 씬은 느렸다 — 08편 실측 9.5초 씬 0.0169/s vs 105초 씬 0.0015/s 로 **11배** 차이였다.
+    #   ("처음에만 빨리 움직이는 것 같아. 한 씬에 오래 유지되면 천천히 움직이더라고.")
+    #   이제 pan_per_sec(초당 이동량)을 고정하고, 씬이 길면 **왕복**시켜 진폭은 그대로 둔다.
+    #   진폭을 늘려 속도를 맞출 수는 없다 — 줌이 덮는 만큼만 움직일 수 있어 가장자리가 드러난다.
+    pan_per_sec = cfg.get("pan_per_sec")
+    dur_sec = max(0.001, duration_us / 1_000_000)
+    if pan_per_sec and mr > 0:
+        leg_sec = (2.0 * mr) / float(pan_per_sec)   # 한 끝에서 반대 끝까지 걸리는 시간
+    else:
+        leg_sec = dur_sec                            # 미설정이면 종전 동작(한 번에 훑기)
+
+    def oscillate(a, b):
+        """a↔b 를 leg_sec 마다 왕복. 끝은 duration 에서 잘라 보간한다 → 속도가 항상 같다."""
+        pts, k, t = [], 0, 0.0
+        while t < dur_sec - 1e-6:
+            pts.append((t, a if k % 2 == 0 else b))
+            k += 1
+            t = k * leg_sec
+        frac = (dur_sec - (k - 1) * leg_sec) / leg_sec if leg_sec > 0 else 1.0
+        frac = min(1.0, max(0.0, frac))
+        prev = a if (k - 1) % 2 == 0 else b
+        nxt = b if (k - 1) % 2 == 0 else a
+        pts.append((dur_sec, prev + (nxt - prev) * frac))
+        return pts
+
+    def to_us(t):
+        return min(end_time, int(round(t * 1_000_000)))
 
     def create_keyframe(time_offset, value):
         return {
@@ -651,42 +715,59 @@ def create_ken_burns_keyframes(duration_us, scene_index, ken_burns_config=None):
             "id": generate_uuid(),
             "material_id": "",
             "property_type": "KFTypePositionX",
-            "keyframe_list": [
-                create_keyframe(0, pattern["start_x"]),
-                create_keyframe(end_time, pattern["end_x"])
-            ]
+            "keyframe_list": [create_keyframe(to_us(t), v)
+                              for t, v in oscillate(pattern["start_x"], pattern["end_x"])]
         },
         {
             "id": generate_uuid(),
             "material_id": "",
             "property_type": "KFTypePositionY",
-            "keyframe_list": [
-                create_keyframe(0, pattern["start_y"]),
-                create_keyframe(end_time, pattern["end_y"])
-            ]
+            "keyframe_list": [create_keyframe(to_us(t), v)
+                              for t, v in oscillate(pattern["start_y"], pattern["end_y"])]
         },
         {
             "id": generate_uuid(),
             "material_id": "",
             "property_type": "KFTypeScaleX",
-            "keyframe_list": [
-                create_keyframe(0, start_scale),
-                create_keyframe(end_time, end_scale)
-            ]
+            "keyframe_list": [create_keyframe(to_us(t), v)
+                              for t, v in oscillate(start_scale, end_scale)]
         }
     ]
 
     return keyframes
 
 
-def create_video_segment(material_id, start_us, duration_us, render_index, extra_refs, scene_index=0, ken_burns_config=None, is_video=False, alpha=1.0):
+def create_fade_keyframes(duration_us, fade_us=700_000):
+    """장부(章) 카드용 알파 페이드 인/아웃 키프레임.
+
+    카드는 Ken Burns 로 움직이면 안 된다(글자가 흔들린다). 대신 투명도로
+    부드럽게 들어왔다 나간다. 2026-08-17 사용자 지시.
+    """
+    fade = min(fade_us, max(1, duration_us // 3))
+    end = max(0, duration_us - 1)
+
+    def kf(t, v):
+        return {"id": generate_uuid(), "curveType": "Line", "time_offset": int(t),
+                "left_control": {"x": 0.0, "y": 0.0}, "right_control": {"x": 0.0, "y": 0.0},
+                "values": [v], "string_value": "", "graphID": ""}
+
+    return [{
+        "id": generate_uuid(), "material_id": "", "property_type": "KFTypeAlpha",
+        "keyframe_list": [kf(0, 0.0), kf(fade, 1.0), kf(end - fade, 1.0), kf(end, 0.0)],
+    }]
+
+
+def create_video_segment(material_id, start_us, duration_us, render_index, extra_refs, scene_index=0, ken_burns_config=None, is_video=False, alpha=1.0, is_card=False):
     """비디오/이미지 segment 생성 (Ken Burns 효과 포함)"""
     segment_id = generate_uuid()
     cfg = ken_burns_config or {}
     movement_range = cfg.get("movement_range", 0.03)
 
-    # Ken Burns 키프레임 생성
-    keyframes = create_ken_burns_keyframes(duration_us, scene_index, ken_burns_config)
+    # Ken Burns 키프레임 생성 — 장부 카드는 움직이지 않고 페이드만 한다
+    if is_card:
+        keyframes = create_fade_keyframes(duration_us)
+    else:
+        keyframes = create_ken_burns_keyframes(duration_us, scene_index, ken_burns_config)
 
     # 시작 위치로 clip 설정
     mr = movement_range
@@ -697,6 +778,11 @@ def create_video_segment(material_id, start_us, duration_us, render_index, extra
         {"start_x": mr, "start_y": mr},
     ]
     pattern = patterns[scene_index % 4]
+    if is_card:
+        # ★장부 카드는 움직이지 않는다 — Ken Burns 시작 오프셋을 주면 화면이 밀려
+        #   좌·상단에 검은 여백이 생긴다(2026-08-17 사용자 발견). 오프셋 0, 스케일은
+        #   캔버스를 확실히 덮도록 살짝 키운다.
+        pattern = {"start_x": 0.0, "start_y": 0.0}
 
     return {
         "id": segment_id,
@@ -840,11 +926,17 @@ def generate_capcut_project(output_dir, project_name=None, capcut_config=None, c
     # 클립 길이에 비례 리타이밍, 이후 모든 자막·씬은 (클립 길이 - 대사 큐 끝)만큼 시프트.
     cold_open = None
     veo_manifest_file = output_dir / "veo_hook.json"
-    if veo_manifest_file.exists() and scenes and scenes[0].get('video_path'):
+    # ★고정 인트로(2026-08-17 신설) — 채널 마스코트 인사 클립을 맨 앞에 붙인다.
+    #   veo 콜드오픈과 달리 인트로 문안은 대본에 없다 → 매칭할 대사 큐가 없는 '순수 프리펜드'다.
+    #   dialogue를 빈 문자열로 두면 아래 매칭 루프가 k=0으로 끝나고,
+    #   자막·씬은 전부 클립 길이만큼 뒤로 밀리며 내레이션은 처음부터(source 0) 클립 직후에 놓인다.
+    intro_manifest_file = output_dir / "intro.json"
+    lead_manifest = intro_manifest_file if intro_manifest_file.exists() else veo_manifest_file
+    if lead_manifest.exists() and scenes and scenes[0].get('video_path'):
         clip_path = (output_dir / scenes[0]['video_path']).resolve()
         if clip_path.exists():
             try:
-                with open(veo_manifest_file, encoding='utf-8') as f:
+                with open(lead_manifest, encoding='utf-8') as f:
                     dialogue = json.load(f).get('dialogue', '')
             except (json.JSONDecodeError, OSError):
                 dialogue = ''
@@ -863,21 +955,24 @@ def generate_capcut_project(output_dir, project_name=None, capcut_config=None, c
                 consumed += len(sub_chars)
                 k += 1
             clip_dur_us = get_audio_duration_us(str(clip_path))
-            if k > 0 and clip_dur_us > 0:
-                dial_end_us = subtitles[k - 1]['start'] + subtitles[k - 1]['duration']
+            # k == 0 은 '대사 없는 선두 클립'(고정 인트로) — 리타이밍 없이 전체를 클립 길이만큼 민다.
+            if clip_dur_us > 0 and (k > 0 or not dialogue):
+                dial_end_us = (subtitles[k - 1]['start'] + subtitles[k - 1]['duration']) if k > 0 else 0
                 shift_us = int(clip_dur_us - dial_end_us)
-                scale = clip_dur_us / dial_end_us
-                for sub in subtitles[:k]:   # 대사 큐 → 클립 발화 속도에 비례 근사
-                    sub['start'] = int(sub['start'] * scale)
-                    sub['duration'] = int(sub['duration'] * scale)
+                if k > 0:
+                    scale = clip_dur_us / dial_end_us
+                    for sub in subtitles[:k]:   # 대사 큐 → 클립 발화 속도에 비례 근사
+                        sub['start'] = int(sub['start'] * scale)
+                        sub['duration'] = int(sub['duration'] * scale)
                 for sub in subtitles[k:]:
                     sub['start'] += shift_us
                 cold_open = {'k': k, 'clip_dur_us': int(clip_dur_us),
                              'dial_end_us': int(dial_end_us), 'shift_us': shift_us}
-                print(f"veo 콜드오픈: 클립 {clip_dur_us/1e6:.1f}s 자체 오디오 사용, "
+                label = "고정 인트로" if k == 0 else "veo 콜드오픈"
+                print(f"{label}: 클립 {clip_dur_us/1e6:.1f}s 자체 오디오 사용, "
                       f"대사 큐 {k}개 리타이밍, 이후 자막 {shift_us/1e6:+.2f}s 시프트")
             else:
-                print("⚠️ veo 콜드오픈 건너뜀: 훅 대사와 선두 자막 큐 매칭 실패 — 기존 방식(음소거 클립)으로 진행")
+                print("⚠️ 선두 클립 건너뜀: 훅 대사와 선두 자막 큐 매칭 실패 — 기존 방식(음소거 클립)으로 진행")
 
     # [story 어댑터] 씬 타이밍 파생: story 파이프라인의 {V}/storyboard.json 은 씬마다
     # subtitle_range[first,last](1-based 자막 큐 범위)만 갖는다(scene_timing.py 산출).
@@ -1140,7 +1235,7 @@ def generate_capcut_project(output_dir, project_name=None, capcut_config=None, c
                     # 비디오는 Ken Burns 효과 비활성화 (이미 움직임이 있으므로)
                     scene_ken_burns = None if spec_is_video else ken_burns_config
                     scene_alpha = 0.5 if i in emphasis_scene_indices else 1.0
-                    segment = create_video_segment(material['id'], spec_start, spec_dur, i, extra_refs, scene_index=i, ken_burns_config=scene_ken_burns, is_video=spec_is_video, alpha=scene_alpha)
+                    segment = create_video_segment(material['id'], spec_start, spec_dur, i, extra_refs, scene_index=i, ken_burns_config=scene_ken_burns, is_video=spec_is_video, alpha=scene_alpha, is_card=bool(scene.get('is_card')))
                     video_segments.append(segment)
 
     # 트랙 구성
@@ -1472,14 +1567,37 @@ def save_to_capcut(project, project_name, audio_path):
             audio['path'] = str(audio_dst)
 
     # 이미지 파일 복사 및 경로 업데이트
+    # ★파일명만으로 복사하면 안 된다 — 옴니버스는 편별 폴더마다 scene_01.png 가 따로 있어
+    #   Resources/ 한 곳에 같은 이름으로 덮어써진다. 2026-08-17 실측: 120장이 25장으로
+    #   뭉개져 타임라인 95개 클립이 엉뚱한 그림을 가리켰고 CapCut 재생이 깨졌다.
+    #   원본 경로가 다르면 목적지 이름도 달라지게 접두사를 붙인다.
+    # ★복사본 이름은 반드시 ASCII로 (2026-08-28 실측). 종전에는 충돌 시 상위 폴더명을
+    #   접두사로 붙였는데, 옴니버스 편 폴더 이름이 한글이라 `260821_0100_업어온아이_scene_01.png`
+    #   같은 이름이 만들어졌다. **CapCut Windows는 이 경로의 이미지를 못 읽어 미리보기가
+    #   통째로 검은 화면이 된다** — 타임라인·자막은 정상이라 원인이 잘 안 보인다.
+    #   (정상 재생되던 07편은 단편이라 복사본이 `scene_01.png`로 전부 ASCII였다.)
+    #   그래서 이름은 붙임 순서 번호 + ASCII로 거른 원래 이름으로 짓는다 — 충돌도 원천 차단.
+    def _ascii_name(src, idx):
+        stem = re.sub(r'[^A-Za-z0-9._-]+', '', src.stem)[:24] or "img"
+        return f"m{idx:04d}_{stem}{src.suffix.lower()}"
+
+    used, copied, idx = {}, 0, 0
     for video in project.get('materials', {}).get('videos', []):
-        if video.get('path'):
-            img_src = Path(video['path'])
-            img_dst = resources_dir / img_src.name
-            if img_src.exists():
-                shutil.copy2(img_src, img_dst)
-            video['path'] = str(img_dst)
-    print(f"이미지 {len(project.get('materials', {}).get('videos', []))}개 복사")
+        if not video.get('path'):
+            continue
+        img_src = Path(video['path'])
+        key = str(img_src.resolve()).lower()
+        if key in used:                       # 같은 원본을 두 씬이 쓰는 경우
+            video['path'] = str(used[key])
+            continue
+        idx += 1
+        dst = resources_dir / _ascii_name(img_src, idx)
+        if img_src.exists():
+            shutil.copy2(img_src, dst)
+            copied += 1
+        used[key] = dst
+        video['path'] = str(dst)
+    print(f"이미지 {copied}개 복사 (참조 {len(project.get('materials', {}).get('videos', []))}개)")
 
     # draft_info.json 저장
     draft_path = project_dir / "draft_info.json"
@@ -1654,7 +1772,7 @@ def main():
         return
 
     # 설정 로드
-    settings = load_settings(args.config)
+    settings = load_settings(args.config, start=output_dir)
     capcut_config = settings.get("capcut", {})
 
     # 프로젝트 이름 결정

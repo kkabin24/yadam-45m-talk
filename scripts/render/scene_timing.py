@@ -155,9 +155,15 @@ def main() -> int:
             fallback_scenes.append(sid)
             first = round(i * len(cues) / n) + 1
             last = round((i + 1) * len(cues) / n)
+        # ★이미지 경로는 소스 storyboard의 image 필드를 우선한다 (2026-08-17 신설).
+        #   옴니버스는 씬 이미지가 {P}/scenes/ 가 아니라 편별 하위 프로젝트에 흩어져 있어
+        #   ({P}/{편프로젝트}/scenes/scene_NN.png), 경로를 하드코딩하면 CapCut export가
+        #   "이미지 0개 복사"로 조용히 끝난다(02편 실측). image가 없으면 기존 규칙으로 폴백.
+        img = sc.get("image")
+        image_path = f"../{img}" if img else f"../scenes/scene_{sid:02d}.png"
         render_scenes.append({
             "id": sid,
-            "image_path": f"../scenes/scene_{sid:02d}.png",
+            "image_path": image_path,
             "description": sc.get("narration", sc.get("description", "")),
             "subtitle_range": [first, max(first, last)],
         })

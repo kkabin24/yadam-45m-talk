@@ -1,16 +1,21 @@
 # 야담 스토리 유튜브 자동화 파이프라인
 
-옛이야기·썰·야담 **내러티브 장편 영상**(2시간+, 3~4만자 대본)을 만드는 자동화 파이프라인입니다.
+옛이야기·썰·야담 **내러티브 장편 영상**을 만드는 자동화 파이프라인입니다.
+현행 편성은 **독립 단편 45분 × 2~3편 옴니버스**(대본 2.5~3.6만자) + 백색소음 아웃트로 —
+완성본이 2~3시간이 됩니다. 저장소 이름의 `45m` 이 이 편당 길이를 가리킵니다.
 Claude Code에서 **"야담 영상 만들어줘"** 한마디로 시작하면, 대본 집필부터 캐릭터 생성,
 스토리보드, 씬 이미지, TTS, CapCut 드래프트까지 자동으로 진행되고 — **사람은 정해진
 검수 지점에서만 개입**합니다.
 
-기본 구성(flow 이미지 + Vrew TTS + CapCut 렌더)은 **API 키·과금이 전혀 필요 없습니다.**
-
 ```
 대본(SCRIPT) → 캐릭터/배경 생성(ASSET★검수) → 스토리보드 → 씬 이미지
-→ TTS(Vrew★수동) → 타이밍 매핑 → CapCut 드래프트(★마무리 편집) → 업로드
+→ TTS(Vrew★수동) → 타이밍 매핑 → 장부 카드 → 훅 클립(VEO)
+→ CapCut 드래프트(★마무리 편집) → 훅 결합 → 인트로 → 아웃트로 → 업로드
 ```
+
+이미지 엔진은 두 가지입니다. `flow`(무료, labs.google 웹세션)와 `gemini`(유료 API) —
+**yadam 채널은 `gemini` 를 씁니다**(flow 일일 한도 회피, `settings.json image.engine`).
+훅 클립 엔진 `pjn` 은 로컬 5090 서버라 무료입니다. TTS(Vrew)와 렌더(CapCut)는 사람이 합니다.
 
 ---
 
@@ -19,8 +24,8 @@ Claude Code에서 **"야담 영상 만들어줘"** 한마디로 시작하면, �
 상세 절차는 **[docs/setup.md](docs/setup.md)** 를 따라가세요. 요약:
 
 ```bash
-git clone https://github.com/nossssi/gogogo2-youtube.git
-cd gogogo2-youtube
+git clone https://github.com/kkabin24/yadam-45m-base.git
+cd yadam-45m-base
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 brew install ffmpeg
@@ -34,6 +39,39 @@ cp .env.example .env        # 기본 구성이면 키를 채울 필요 없음
 2. 버너 계정으로 [labs.google Flow](https://labs.google/fx/ko/tools/flow) 로그인, 탭 유지
 3. `python3 scripts/image/flow_token_server.py` 실행(켜둔 채로)
 4. 확장 아이콘 → **Connect**
+
+### ★이 저장소에 **없는** 것 — 새 PC에서 따로 채워야 하는 것
+
+저장소에는 **코드로 다시 만들 수 없는 것만** 담았습니다. 아래 셋은 용량이 크거나 비밀정보라
+git 밖에 있습니다. 없으면 그 단계에서 멈춥니다.
+
+| 없는 것 | 어디에 두나 | 없으면 |
+|---|---|---|
+| **수면 노이즈 아웃트로** (42MB~248MB, GitHub 100MB 한도 초과) | `channels/yadam/assets/intro,outro/sleep_noise_{30min,1h,2h,3h}_quiet.mp3` | OUTRO 단계에서 멈춘다 |
+| **`.env`** — `GEMINI_API_KEY`(유료 이미지), `PJN_API_KEY`(훅 클립) | 루트 `.env` | 이미지·훅 생성 불가 |
+| **YouTube OAuth** — `client_secret.json` | `channels/yadam/config/youtube-api/` | 업로드만 불가(제작은 됨) |
+
+인트로 승인본(`assets/intro/intro_ver3_bgm_sub_lufs128.mp4`)과 화풍 앵커
+(`config/style_anchor.png`)는 **저장소에 들어 있습니다** — 둘 다 다시 만들 수 없는 기준물이라
+빠지면 화풍이 통째로 달라집니다.
+
+### ★규칙은 코드로 막혀 있다 — 검사기 목록
+
+이 파이프라인의 규칙 대부분은 문서가 아니라 **검사기**로 강제됩니다. 그림을 뽑거나 업로드하기
+전에 돌리면 되돌릴 수 없는 실수를 막습니다.
+
+```bash
+python3 scripts/script/validate_script.py {S}/chapters --style   # 분량·호흡·문체 밴드
+python3 scripts/script/check_density.py    {S}/chapters          # 같은 일감 반복·맨 시간점프
+python3 scripts/script/check_sameness.py   {S}/chapters          # 편끼리 같은 느낌인가
+python3 scripts/script/check_clarity.py    {S}/chapters          # 귀로 한 번 듣고 잡히는가
+python3 scripts/storyboard/check_desc.py   {P}/{편}              # ★그림 뽑기 전 — 구도·표정·캐스팅·배경 고정
+python3 scripts/render/check_scenes.py     {P}/{편}              # 흰 액자·레터박스
+python3 scripts/script/check_meta.py       {P}                   # ★업로드 전 — 설명문 서식·챕터·해시태그
+```
+
+`check_desc.py` 는 인물이 나오는 씬에 구도나 표정이 없으면 **한 장도 생성하지 않고 멈춥니다**
+(종료코드 2). 경고만으로는 안 막혀서 게이트로 바꾼 것입니다 — 자세한 사연은 `CLAUDE.md` 에 있습니다.
 
 ---
 

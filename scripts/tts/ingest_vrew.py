@@ -6,10 +6,16 @@ Vrew 반수동 모드 — 사용자가 Vrew에서 뽑은 음성+SRT를 파이프
 
 흐름:
     1) --export-script 로 {P}/vrew/vrew_script.txt 생성 (= script.txt).
-       **Vrew 붙여넣기 한도(기본 9,800자, 공백 포함) 초과 시 문단 경계에서
+       **Vrew 붙여넣기 한도(1만 자, 공백 포함 — 기본 경고선 9,950) 초과 시 문단 경계에서
        vrew_script_part01.txt, part02… 로 자동 분할** — 파트마다 별도 Vrew 프로젝트로
        낭독하고(같은 보이스·같은 속도), 내보내기 파일명에 파트 번호를 붙인다
        (예: narration_01.mp3 + narration_01.srt).
+
+    1') ★옴니버스(playbook v3.0) — `--chapters` 로 **편 단위 export**. 파트 번호 = 편 번호.
+       script.txt 병합 전에도 쓸 수 있어 **속도 게이트**가 가능하다:
+         python3 scripts/tts/ingest_vrew.py {P} --chapters 1      # 1편만 먼저 낭독받아 속도 실측
+         python3 scripts/tts/ingest_vrew.py {P} --chapters 2-6    # 속도 확정 후 나머지
+       원천은 {P}/_script/chapters/NN.md (마크다운 제목·주석 줄은 제외).
     2) 사용자가 Vrew에서 음성/자막 내보내기 → {P}/vrew/ 에 저장 (여러 파트 가능)
     3) 본 스크립트 실행 → {V}/audio.mp3, {V}/subtitle.srt(프레임 스냅), {V}/sentences.json
        여러 파트면 이름순으로 짝지어 오디오를 병합(WAV 샘플 정확도로 오프셋 계산)하고
@@ -42,8 +48,49 @@ AUDIO_EXTS = (".mp3", ".wav", ".m4a", ".aac")
 
 
 def load_spoken_text(project_dir: pathlib.Path) -> str:
-    """발화 텍스트 = script.txt. (vrew 모드는 단일 나레이션 — 화자 분리 없음)"""
-    return (project_dir / "script.txt").read_text(encoding="utf-8").strip()
+    """발화 텍스트 = script.txt. (vrew 모드는 단일 나레이션 — 화자 분리 없음)
+
+    script.txt에 인라인 마크다운이 남아 있어도 낭독 대본에는 들어가지 않게 한 번 더 거른다."""
+    text = (project_dir / "script.txt").read_text(encoding="utf-8").strip()
+    return strip_inline_markdown(text)
+
+
+def parse_chapter_spec(spec: str) -> list[int]:
+    """'1' / '2-6' / '2,3,5' → [1] / [2,3,4,5,6] / [2,3,5]"""
+    nums = []
+    for tok in spec.split(","):
+        tok = tok.strip()
+        if "-" in tok:
+            a, b = tok.split("-", 1)
+            nums.extend(range(int(a), int(b) + 1))
+        elif tok:
+            nums.append(int(tok))
+    return sorted(set(nums))
+
+
+def strip_inline_markdown(text: str) -> str:
+    """★인라인 마크다운 제거 (2026-08-16 신설).
+
+    대본은 대사를 `**"..."**` 로 표시하는데, 이 별표가 그대로 남으면
+    Vrew가 낭독에 섞어 읽거나 내보낸 SRT 자막에 그대로 찍힌다.
+    낭독 대상 텍스트에서는 반드시 지운다."""
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text, flags=re.S)   # **강조**
+    text = re.sub(r"__(.+?)__", r"\1", text, flags=re.S)        # __강조__
+    text = re.sub(r"(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)", r"\1", text, flags=re.S)  # *강조*
+    return text.replace("`", "")
+
+
+def load_chapter_text(project_dir: pathlib.Path, n: int) -> str:
+    """{S}/chapters/NN.md 한 편의 발화 텍스트. 마크다운 제목·주석 줄과 인라인 강조를 뺀다."""
+    path = project_dir / "_script" / "chapters" / f"{n:02d}.md"
+    if not path.exists():
+        raise FileNotFoundError(f"편 파일 없음: {path}")
+    lines = [
+        ln for ln in path.read_text(encoding="utf-8").splitlines()
+        if not ln.lstrip().startswith(("#", ">", "<!--"))
+    ]
+    text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+    return strip_inline_markdown(text)
 
 
 def split_for_vrew(text: str, limit: int) -> list[str]:
@@ -79,10 +126,66 @@ def split_for_vrew(text: str, limit: int) -> list[str]:
     return parts
 
 
-def export_script(project_dir: pathlib.Path, paste_limit: int = 9800) -> int:
+
+def export_chapters(project_dir: pathlib.Path, chapters: list[int], paste_limit: int = 9950) -> int:
+    """★옴니버스 전용 — 편(篇) 단위로 vrew_script_partNN[a-z].txt 생성.
+
+    script.txt 병합 전에도 쓸 수 있다. 용도 두 가지:
+      1) 속도 게이트 — 1편만 먼저 낭독받아 실측 자/분을 잰다 (`--chapters 1`)
+      2) 나머지 편 일괄 export (`--chapters 2-6`)
+
+    ★한 편이 한도를 넘으면 문단 경계에서 쪼갠다 (사용자 지시 2026-08-20 — 종전 지시 뒤집음).
+      종전에는 "한 편 = 한 파일"을 유지하고 경고만 띄운 뒤 Vrew 화면에서 나눠 붙여넣게 했다.
+      그런데 **Vrew는 한 프로젝트가 1만 자를 넘으면 낭독 자체를 거부한다** — 나눠 붙여넣어도
+      한 프로젝트 안에서는 합산되므로 소용이 없었다(05편 1편 18,514자로 실측 확인).
+      그래서 파일을 쪼갠다. 편 번호는 유지하고 뒤에 a·b·c를 붙여 순서와 소속을 함께 남긴다:
+        1편 18,000자 → vrew_script_part01a.txt + part01b.txt
+      낭독본도 같은 이름으로 받는다(narration_01a.mp3 + narration_01a.srt, 01b…).
+      ingest 는 파일명 정렬 순서로 병합하므로 01a → 01b → 02a … 순서가 그대로 보장된다.
+    """
+    vrew_dir = project_dir / "vrew"
+    vrew_dir.mkdir(exist_ok=True)
+    for old in vrew_dir.glob("vrew_script_part*.txt"):
+        old.unlink()                      # 이전 분할 흔적 제거 (파트 수가 줄어드는 경우 대비)
+
+    print(f"편 단위 export — 한도 {paste_limit:,}자(공백 포함), 넘으면 문단 경계에서 분할 (총 {len(chapters)}편)")
+    names = []
+    for n in chapters:
+        text = load_chapter_text(project_dir, n)
+        chunks = split_for_vrew(text, paste_limit)
+        for i, chunk in enumerate(chunks):
+            sfx = "" if len(chunks) == 1 else chr(ord("a") + i)
+            pp = vrew_dir / f"vrew_script_part{n:02d}{sfx}.txt"
+            pp.write_text(chunk + "\n", encoding="utf-8")
+            nos = len(re.sub(r"\s", "", chunk))
+            names.append(pp.stem.replace("vrew_script_part", ""))
+            print(f"  ✓ {pp.name}  (공백 포함 {len(chunk):,}자 / 공백 제외 {nos:,}자)")
+        if len(chunks) > 1:
+            print(f"    └ {n}편은 {len(chunks)}개로 분할 — 낭독은 같은 보이스·같은 설정으로 이어서")
+
+    print(f"""
+Vrew 낭독 안내 (반드시 **모든 파트 같은 보이스·같은 속도**):
+  1. 파일마다 별도 Vrew 프로젝트를 만들어 vrew_script_partNN[a-z].txt 내용을 붙여넣기
+     ★한 프로젝트에 1만 자를 넘겨 넣지 말 것 — Vrew가 낭독을 거부한다.
+  2. 내보내기 파일명을 대본 파일과 똑같이 맞춰 {vrew_dir}/ 에 저장 —
+     예: narration_01a.mp3 + narration_01a.srt, narration_01b.mp3 + narration_01b.srt …
+     (이름순 정렬이 곧 낭독 순서다: 01a → 01b → 02a → …)
+  3. 전 파트가 모이면:  python3 scripts/tts/ingest_vrew.py {project_dir}
+
+★낭독이 도착하면 속도를 재서 {{S}}/_speed.json 의 cpm_measured 를 채운다.
+   실측 자/분 = (위 '공백 제외' 글자수) ÷ (낭독 분)
+   ★분량을 늘려 맞추지 않는다 (playbook v4.1 §1) — 본편이 짧으면 아웃트로를 키운다.
+   ★씬 밀도는 실측 시각으로 다시 잰다 — cut_by_time 을 재실행하지 말고 구간별 최장 씬만 쪼갠다.
+   (1편만 먼저 낭독받아 속도를 정하는 게이트는 05편 이후 쓰지 않는다.)""")
+    return 0
+
+
+def export_script(project_dir: pathlib.Path, paste_limit: int = 9950) -> int:
     """Vrew에 붙여넣을 대본 생성 (나레이터 보이스 하나로 전체 낭독).
 
-    Vrew 한도(공백 포함 ~1만자) 초과 시 문단 경계에서 파트 파일로 분할."""
+    Vrew 한도(공백 포함 ~1만자) 초과 시 문단 경계에서 파트 파일로 분할.
+    ※ 옴니버스는 편 하나가 한도 안에 들고 두 편은 넘으므로 이 분할이 자연히 편 경계에 떨어진다.
+      편 경계를 확실히 하려면 `--chapters 1-6`을 쓴다."""
     vrew_dir = project_dir / "vrew"
     vrew_dir.mkdir(exist_ok=True)
 
@@ -221,6 +324,9 @@ def main() -> int:
     ap.add_argument("--config", help="settings.json 경로 (fps, max_chars)")
     ap.add_argument("--video-subdir", default="_video")
     ap.add_argument("--export-script", action="store_true", help="Vrew용 대본만 생성하고 종료")
+    ap.add_argument("--chapters", metavar="SPEC",
+                    help="★옴니버스: 편 단위 export ('1' / '2-6' / '2,3,5'). "
+                         "파트 번호 = 편 번호. script.txt 병합 전에도 가능 — 속도 게이트용")
     args = ap.parse_args()
 
     P = args.project_dir.resolve()
@@ -229,7 +335,10 @@ def main() -> int:
         settings = json.loads(pathlib.Path(args.config).read_text(encoding="utf-8"))
     fps = settings.get("subtitle", {}).get("fps", 30)
     max_chars = settings.get("subtitle", {}).get("max_chars", 20)
-    paste_limit = settings.get("tts", {}).get("vrew_paste_limit", 9800)
+    paste_limit = settings.get("tts", {}).get("vrew_paste_limit", 9950)
+
+    if args.chapters:
+        return export_chapters(P, parse_chapter_spec(args.chapters), paste_limit)
 
     if args.export_script:
         return export_script(P, paste_limit)

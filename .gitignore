@@ -26,3 +26,40 @@ node_modules/
 # ── OS / 에디터 / Claude 로컬 설정 ────────────────────────
 .DS_Store
 .claude/settings.local.json
+
+# ══════════════════════════════════════════════════════════
+# ★2026-09-05 — 「핵심 코드 저장소」 경계 (yadam-45m-base)
+#   다른 PC에서 같은 파이프라인을 돌릴 수 있는 것까지만 담는다.
+#   판단 기준: **코드로 다시 만들 수 없는 것만 넣는다.**
+# ══════════════════════════════════════════════════════════
+
+# ── 대용량 미디어: 코드가 아니라 산출물 ────────────────────
+#   수면 노이즈는 42MB~248MB — GitHub 파일 한도(100MB)를 넘는 것도 있다.
+#   생성 방법은 docs/setup.md 에 적어 두고 파일 자체는 각자 로컬에 둔다.
+channels/*/assets/**/sleep_noise_*.mp3
+
+# ── 인트로 중간 산출물: 승인본 하나만 남긴다 ───────────────
+#   `attach_intro.py` 의 DEFAULT_INTRO 가 가리키는 파일만 있으면 파이프라인이 돈다.
+channels/*/assets/intro/clip1.mp4
+channels/*/assets/intro/intro_ver3_video.mp4
+channels/*/assets/intro/intro_ver3_bgm.mp4
+channels/*/assets/intro/intro_ver3_bgm_sub.mp4
+channels/*/assets/intro,outro/*.mp4
+channels/*/assets/intro,outro/*.mp3
+
+# ── 썸네일·백업 압축본 ────────────────────────────────────
+channels/*/assets/thumbnails/
+channels/*/*.zip
+
+# ── 벤치마킹 중 대용량 스크린샷 묶음 (분석 결과 md 는 커밋) ─
+channels/*/research/refs/storyboard_density_*/
+
+# ── 로컬 도구·플러그인 상태 ───────────────────────────────
+.bkit/
+scripts/_pytools/
+
+# ── 코드 백업본(.prev) — 롤백은 git 이력으로 한다 ──────────
+scripts/**/*.prev*.py
+
+# ── 옛 버전 자산(_prev): 승인본만 남긴다 ───────────────────
+channels/*/assets/intro/_prev/

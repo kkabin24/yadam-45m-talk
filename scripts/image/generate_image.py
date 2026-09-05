@@ -23,9 +23,33 @@ import base64
 import json
 import os
 import pathlib
+import ssl
 import sys
 import urllib.error
 import urllib.request
+
+
+def ssl_context() -> ssl.SSLContext | None:
+    """Windows 인증서 저장소를 우회한 TLS 컨텍스트.
+
+    ★2026-08-04 실측: Windows 인증서 저장소에 ASN1이 깨진 항목이 하나라도 들어가면
+    `ssl.create_default_context()`가 `_load_windows_store_certs`에서
+    `SSLError: [ASN1: NOT_ENOUGH_DATA]`로 죽는다 — Gemini 호출이 전량 실패한다.
+    `SSL_CERT_FILE` 환경변수로도 못 막는다(저장소를 읽는 게 먼저다).
+    certifi 번들을 cafile로 직접 지정하면 저장소를 아예 안 읽는다.
+    certifi가 없으면 None을 돌려 기존 동작(기본 컨텍스트)으로 둔다.
+    """
+    cafile = os.environ.get("SSL_CERT_FILE")
+    if not cafile:
+        try:
+            import certifi
+            cafile = certifi.where()
+        except Exception:
+            return None
+    try:
+        return ssl.create_default_context(cafile=cafile)
+    except Exception:
+        return None
 
 
 def img_part(path: pathlib.Path) -> dict:
@@ -169,7 +193,7 @@ def main() -> int:
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=args.timeout) as resp:
+        with urllib.request.urlopen(req, timeout=args.timeout, context=ssl_context()) as resp:
             payload = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         body_text = e.read().decode(errors="replace")

@@ -10,12 +10,15 @@ Vrew 자막 큐 정형화 (반수동 모드 후처리) — 두 패스:
 패스 1) 길이 분할 — 비공백 글자수 > max_chars 인 큐를 어절 경계에서 균등 분할
     (쉼표 등 구두점 경계 우선).
 
-타이밍 근거 2단계 (두 패스 공통):
-    1) whisper — {V}/whisper/audio.json (openai-whisper --word_timestamps True)의
-       단어별 실측 시각으로 분할점을 찍는다. 큐 구간 안의 인식 글자수가 원문과
-       25% 이상 어긋나면 그 큐는 신뢰하지 않고 2)로.
-    2) ratio — 큐 길이를 비공백 음절 수 비례로 나눈다 (오차 ±0.2초 수준).
+타이밍 근거 (두 패스 공통):
+    ratio(기본) — 큐 길이를 비공백 음절 수 비례로 나눈다 (오차 ±0.2초 수준).
     새 경계는 fps 프레임 그리드에 스냅, 조각당 최소 10프레임 보장.
+
+    ★whisper는 기본 끔 (2026-08-21 사용자 지시). `--whisper`를 줄 때만 돈다.
+      2시간 넘는 낭독에서 전사에 수십 분이 걸리는데, 얻는 것은 **한 큐 안 분할점이
+      ±0.2초 정밀해지는 것뿐**이다(큐 자체의 시작·끝은 Vrew SRT가 이미 실측값이다).
+      씬 경계는 패스 0의 문장 스냅이 잡으므로 whisper 없이도 씬↔큐 정렬은 보장된다.
+      쓰려면: `--whisper [--model medium]`.
 
 출력:
     {V}/subtitle.split.srt   적용본(스냅+분할) — 검수 후 subtitle.srt로 교체
@@ -57,15 +60,28 @@ def run_whisper(audio: pathlib.Path, out_dir: pathlib.Path, model: str = "medium
         j.unlink()
     out_dir.mkdir(parents=True, exist_ok=True)
     print(f"⏳ whisper {model} 실행 중 ({audio.name}) — 수 분 걸립니다…")
-    r = subprocess.run(
-        ["whisper", str(audio), "--model", model, "--language", "ko",
-         "--word_timestamps", "True", "--output_format", "json",
-         "--output_dir", str(out_dir)],
-        capture_output=True, text=True,
+    args = [str(audio), "--model", model, "--language", "ko",
+            "--word_timestamps", "True", "--output_format", "json",
+            "--output_dir", str(out_dir)]
+    # ★Windows+miniconda SSL 함정 (2026-08-17 실측 — 02편에서 whisper가 통째로 실패했다):
+    #   whisper는 첫 실행에 모델을 내려받는데, urllib 기본 SSL 컨텍스트가 윈도우 인증서
+    #   저장소를 읽다 `ssl.SSLError: [ASN1: NOT_ENOUGH_DATA]`로 죽는다.
+    #   build_intro.py의 use_certifi_ssl()과 같은 처방이지만, whisper가 **하위 프로세스**라
+    #   부모에서 패치해도 안 먹는다 → certifi 컨텍스트를 심은 파이썬으로 CLI를 직접 부른다.
+    preamble = (
+        "import ssl, certifi, sys;"
+        "ctx = ssl.create_default_context(cafile=certifi.where());"
+        "ssl._create_default_https_context = lambda *a, **k: ctx;"
+        "from whisper.transcribe import cli; sys.argv[0] = 'whisper'; cli()"
     )
+    r = subprocess.run([sys.executable, "-c", preamble] + args,
+                       capture_output=True, text=True)
     if r.returncode != 0 or not j.exists():
-        print(f"⚠️ whisper 실패 — ratio 폴백만 사용: {r.stderr[-300:]}")
-        return None
+        # certifi 경로가 없는 환경을 위해 원래 CLI로 한 번 더 시도
+        r2 = subprocess.run(["whisper"] + args, capture_output=True, text=True)
+        if r2.returncode != 0 or not j.exists():
+            print(f"⚠️ whisper 실패 — ratio 폴백만 사용: {(r.stderr or r2.stderr)[-300:]}")
+            return None
     return j
 
 
@@ -365,16 +381,35 @@ def main() -> int:
     ap.add_argument("--config", help="settings.json 경로 (fps, max_chars)")
     ap.add_argument("--video-subdir", default="_video")
     ap.add_argument("--model", default="medium")
-    ap.add_argument("--no-whisper", action="store_true", help="ratio 분배만 사용")
+    # ★whisper는 기본 끔 (2026-08-21 사용자 지시). 두 시간대 낭독에서 전사가 수십 분 걸리는데
+    #   ratio 폴백과의 차이가 자막 한 큐 안 ±0.2초라 비용 대비 얻는 것이 없다.
+    #   쓰려면 --whisper 를 명시한다. --no-whisper 는 옛 호출부 호환용으로 남겨 두되 무시된다.
+    ap.add_argument("--whisper", action="store_true",
+                    help="whisper 단어 실측으로 분할점을 찍는다 (기본: 끔, 음절 비례 분배 사용)")
+    ap.add_argument("--no-whisper", action="store_true",
+                    help="(구) ratio 분배만 사용 — 이제 기본 동작이라 아무 효과 없음")
     ap.add_argument("--no-snap", action="store_true", help="문장 경계 스냅(패스 0) 생략")
     ap.add_argument("--apply", action="store_true", help="subtitle.srt 교체 + sentences.json에 큐 범위 기록")
     args = ap.parse_args()
 
-    settings = {}
+    # ★--config 를 안 주면 채널 설정을 못 읽고 코드 기본값으로 조용히 떨어진다 (2026-08-29 실측).
+    #   09편이 그렇게 max_chars 20 으로 돌아 자막 큐의 55%가 채널 기준(13)을 넘었고,
+    #   CapCut 폰트 10 기준 한 줄 용량(~20칸)을 초과해 **두 줄로 접혀서** 렌더됐다.
+    #   그래서 --config 가 없으면 프로젝트 상위로 올라가며 config/settings.json 을 스스로 찾는다.
+    settings, cfg_src = {}, None
     if args.config and pathlib.Path(args.config).exists():
-        settings = json.loads(pathlib.Path(args.config).read_text(encoding="utf-8"))
+        cfg_src = pathlib.Path(args.config)
+    else:
+        for parent in [args.project_dir.resolve()] + list(args.project_dir.resolve().parents):
+            cand = parent / "config" / "settings.json"
+            if cand.exists():
+                cfg_src = cand
+                break
+    if cfg_src:
+        settings = json.loads(cfg_src.read_text(encoding="utf-8"))
     fps = settings.get("subtitle", {}).get("fps", 30)
     max_chars = settings.get("subtitle", {}).get("max_chars", 20)
+    print(f"[설정] max_chars={max_chars} fps={fps}  ({cfg_src if cfg_src else '★설정 파일을 못 찾아 코드 기본값'})")
 
     V = args.project_dir.resolve() / args.video_subdir
     srt_path = V / "subtitle.srt"
@@ -391,11 +426,13 @@ def main() -> int:
             print("⚠️ sentences.json 없음 — 문장 경계 스냅 건너뜀 (ingest_vrew를 먼저 실행하세요)")
 
     words = []
-    if not args.no_whisper:
+    if args.whisper:
         wj = run_whisper(V / "audio.mp3", V / "whisper", args.model)
         if wj:
             words = load_words(wj)
             print(f"✓ whisper 단어 {len(words)}개 로드")
+    else:
+        print("· whisper 건너뜀(기본) — 음절 비례 분배로 진행. 필요하면 --whisper")
 
     # 패스 0 — 문장 경계 스냅
     bounds, snap_report = None, []
