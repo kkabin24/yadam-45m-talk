@@ -8,7 +8,17 @@
 channels/*/config/youtube-api/
 
 # ── 개인 작업물: 프로젝트는 전체 제외 ──────────────────────
+#    ★2026-09-06 예외 — 대본은 텍스트이고 이 저장소의 결과물이다.
+#    씬 이미지·mp4·낭독 음원 같은 대용량 산출물은 그대로 제외한다.
 channels/*/projects/
+!channels/*/projects/
+!channels/*/projects/*/
+!channels/*/projects/*/script.txt
+!channels/*/projects/*/meta.txt
+!channels/*/projects/*/_script/
+!channels/*/projects/*/_script/**/
+!channels/*/projects/*/_script/**/*.md
+!channels/*/projects/*/_script/**/*.json
 renders/
 
 # ── research: 공유 대장(topic_log)·벤치마킹(refs)·제안서는 커밋,
