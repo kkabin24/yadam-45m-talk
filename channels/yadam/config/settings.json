@@ -1,0 +1,83 @@
+{
+  "id": "yadam",
+  "name": "야담",
+  "type": "스토리/내러티브 (야담·전래 썰)",
+  "target": "옛이야기·괴담·따뜻한 썰을 즐기는 시청자",
+  "tone": "차분한 옛이야기 나레이션, 담백하고 여운 있게",
+  "image": {
+    "engine": "gemini",
+    "_comment_engine": "flow | gemini. gemini: 유료 API(나노바나나 1 = gemini-2.5-flash-image, 아래 gemini 블록, 일일 한도 없음, GEMINI_API_KEY 필요 — 2026-07-25 사용자 지시로 채널 기본 전환). flow: labs.google 웹세션 무료 생성(데몬+Chrome 필요, banana 모델·2K 업스케일). 엔진은 generate_image.py가 이 값을 읽어 자동 분기(호출부 무관). 무료로 돌리려면 이 값만 flow로.",
+    "flow": {
+      "model": "banana",
+      "_comment_model": "banana=Nano Banana(NARWHAL, 기본 — 일관성 banana-pro 동급·일일 쿼터 훨씬 느슨, A/B 실측 2026-07) | banana-pro=Nano Banana Pro(GEM_PIX_2, 쿼터 빡빡 ~15장/일) | imagen4=IMAGEN_3_5(일관성 약함)",
+      "upscale": "2K",
+      "_comment_upscale": "생성 후 upsampleImage 업스케일: 2K(기본)|4K|\"\"(끄기). 실패 시 원본(1376x768) 저장으로 폴백.",
+      "ratio": "16:9",
+      "ports": [
+        3849
+      ],
+      "_ports_full": [
+        3847,
+        3848,
+        3849
+      ],
+      "_comment_ports": "멀티계정 레인. 계정(Chrome 프로필)마다 데몬 포트 하나. 예: [3847,3848,3849]. flow_multi.py로 기동. 클라이언트가 놀고있는 레인을 임대해 병렬 생성 → 계정 수만큼 처리량/쿼터↑. 개인 레인은 커밋하지 말고 FLOW_PORTS=3849 처럼 env로 오버라이드.",
+      "port": 3847,
+      "_comment": "project_id는 데몬별 ~/.flow-proxy/token_<port>.json에 저장(확장 Connect 또는 /set-project). 배치 전 데몬 상주 + 각 프로필 Flow 탭 로그인 필요."
+    },
+    "gemini": {
+      "model": "gemini-2.5-flash-image",
+      "_comment": "engine=gemini(유료 API)일 때 이미지 모델. gemini-2.5-flash-image=Nano Banana 1(비용 기본, 2026-07-19 사용자 지정) | gemini-3-pro-image=Nano Banana Pro(2K, 더 비쌈)."
+    },
+    "veo": {
+      "engine": "flow",
+      "model": "veo-3.1-fast-generate-preview",
+      "resolution": "1080p",
+      "_comment": "훅 인트로 i2v 립싱크 클립(scripts/render/veo_hook.py, ⚠️유료). engine=flow: labs.google 웹세션(아래 flow 블록 :3849 구독 레인, 데몬+Chrome 필요 — 2026-07-19 사용자 지시로 기본 복귀) | gemini: Gemini API(GEMINI_API_KEY, 데몬 불필요, 유료 폴백). model 필드는 gemini 전용, flow는 아래 flow.model 사용.",
+      "flow": {
+        "ports": [
+          3849
+        ],
+        "model": "veo-fast",
+        "_comment": "flow 엔진 전용. ports는 Google AI Pro 구독 계정 레인(nossilecture=3849)."
+      }
+    }
+  },
+  "tts": {
+    "engine": "vrew",
+    "_comment_engine": "elevenlabs | vrew. vrew: 사용자가 Vrew에서 음성+SRT를 뽑아 {P}/vrew/에 넣고 scripts/tts/ingest_vrew.py 실행 (TTS·무음압축 단계 건너뜀). 아래 voice 설정은 elevenlabs 전용.",
+    "voice_id": "7oLyBHyhxAjrctX6ZQlw",
+    "voice_name": "Bomisori - Warm and Clear",
+    "model_id": "eleven_v3",
+    "speed": 1.0,
+    "stability": 0.5,
+    "similarity_boost": 0.75
+  },
+  "silence": {
+    "min_silence": 0.6,
+    "target_silence": 0.3,
+    "silence_thresh_db": -50
+  },
+  "subtitle": {
+    "max_chars": 14,
+    "fps": 30
+  },
+  "render": {
+    "engine": "capcut",
+    "_comment_engine": "capcut 전용. capcut_export.py가 {V} 산출물로 CapCut 드래프트 생성 → 사람이 마무리 편집 후 {P}/output/에 mp4 내보내기.",
+    "fps": 30,
+    "width": 1920,
+    "height": 1080
+  },
+  "capcut": {
+    "subtitle": {
+      "font_size": 10.0,
+      "text_color": "#FFFFFF",
+      "border_color": "#000000",
+      "border_width": 0.08,
+      "background_alpha": 0.0,
+      "_comment": "자막 스타일 기본값 = 흰 글자 + 검은 외곽선 + 배경 없음(alpha 0) + 폰트 7.0(코드 기본 5.0 대비 +2pt). capcut_export.py가 이 블록을 읽는다(settings.capcut.subtitle). 검은 배경으로 돌리려면 background_alpha를 0.7로.",
+      "line_max_width": 0.9
+    }
+  }
+}
