@@ -1,0 +1,69 @@
+{
+  "_comment": "인물별 목소리 고정 — 같은 인물의 클립은 같은 seed, 같은 영문 묘사, 같은 계열 시작 프레임으로 뽑는다. ref_audios(음성 레퍼런스)는 작동하지 않으므로 쓰지 않는다(2026-09-06 실측: 정반대 목소리를 강제해도 출력이 안 바뀜, i2v·r2v 동일). r2v는 first_frame을 버려 스틸→클립 연결이 깨지므로 i2v로만 간다.",
+  "_seed_rule": "seed는 아무 정수나 좋다. 한 번 정하면 그 인물의 클립 전부에 그대로 쓴다. 인물마다 다른 값을 준다.",
+  "_alias_rule": "★같은 사람을 대본이 두 이름으로 부르면 두 키를 다 등록하고 seed·묘사를 똑같이 둔다. 1화의 여인은 41분에 이름이 밝혀져 그전까지 '여인'으로 불린다 — 이름이 바뀐다고 목소리가 바뀌면 안 된다.",
+
+  "characters": {
+    "덕보": {
+      "seed": 100101,
+      "speaker_en": "The young man in his late twenties with a weathered sunburnt face, in a coarse grey hemp jacket",
+      "listener_en": "the other people beside him",
+      "_note": "1화 주인공. 과묵하고 목소리가 낮다"
+    },
+    "여인": {
+      "seed": 100102,
+      "speaker_en": "The young woman in her twenties with a pale drawn face, in a worn dark skirt, her hair tied back plainly",
+      "listener_en": "the man standing beside her",
+      "_note": "1화 순덕. 41분 전까지 대본이 '여인'으로 부른다 — 아래 순덕과 같은 목소리여야 한다"
+    },
+    "순덕": {
+      "seed": 100102,
+      "speaker_en": "The young woman in her twenties with a pale drawn face, in a worn dark skirt, her hair tied back plainly",
+      "listener_en": "the man standing beside her",
+      "_note": "위 '여인'과 같은 사람 — seed와 묘사를 반드시 같게 둔다"
+    },
+    "막실": {
+      "seed": 100103,
+      "speaker_en": "The old ferryman with a thin white beard and a deeply lined face, in a faded brown jacket",
+      "listener_en": "the young man beside him",
+      "_note": "1화 막실 노인. 참견 많고 정 많은 어조"
+    },
+    "청지기": {
+      "seed": 100104,
+      "speaker_en": "The middle-aged steward in a clean pale overcoat and a black horsehair hat, holding a folding fan",
+      "listener_en": "the young man facing him",
+      "_note": "1화 대갓집 청지기. 사무적이고 또렷한 어조. 악인이 아니다"
+    },
+
+    "분이": {
+      "seed": 100201,
+      "speaker_en": "The young widow in her mid-twenties with a firm steady gaze, in a plain white jacket and dark skirt",
+      "listener_en": "the people standing around her",
+      "_note": "2화 주인공. 말이 많고 물러서지 않는다 — 덕보와 정반대 기질이니 어조도 갈려야 한다"
+    },
+    "만석": {
+      "seed": 100202,
+      "speaker_en": "The man in his forties with a broad flushed face and rough hands, in a dark work jacket",
+      "listener_en": "the young woman facing him",
+      "_note": "2화 시아주버니. 처음엔 몰아세우고 뒤에는 무너진다"
+    },
+    "시어머니": {
+      "seed": 100203,
+      "speaker_en": "The old woman with white hair pinned back and a stooped frame, in a pale grey jacket, holding a walking stick",
+      "listener_en": "the young woman beside her",
+      "_note": "2화. 낮고 느린 어조"
+    },
+    "춘삼": {
+      "seed": 100204,
+      "speaker_en": "The elderly farmer with a sun-darkened face and sparse grey hair, in a patched hemp jacket",
+      "listener_en": "the villagers around him",
+      "_note": "2화 춘삼 노인. 막실 노인과 같은 '늙은 남자'라 seed를 확실히 갈라 둔다"
+    },
+    "현감": {
+      "seed": 100205,
+      "speaker_en": "The young county magistrate in a dark official robe and black hat, seated upright",
+      "listener_en": "the people kneeling in the courtyard",
+      "_note": "2화. 부임 반년의 젊은 사람 — 노인 목소리가 나오면 안 된다"
+    }
+  }
+}

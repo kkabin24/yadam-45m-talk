@@ -489,18 +489,23 @@ def _pjn_multipart(fields: dict, file_field: str, file_path: pathlib.Path) -> tu
 
 
 def veo_pjn(prompt: str, frame: pathlib.Path, out_path: pathlib.Path, key: str,
-            ratio: str, quality: float, duration: int) -> int:
-    """PJN 서버 i2v: POST /v1/jobs → 폴링 → mp4 다운로드. 성공 0."""
+            ratio: str, quality: float, duration: int, seed: int | None = None) -> int:
+    """PJN 서버 i2v: POST /v1/jobs → 폴링 → mp4 다운로드. 성공 0.
+
+    seed: 인물별 목소리 고정용(2026-09-06 실측). 같은 시작 프레임 + 같은 영문 화자 묘사 +
+    같은 seed 셋이 목소리를 결정한다. ★API의 ref_audios(음성 레퍼런스)는 작동하지 않는다 —
+    정반대 목소리(젊은 여성)를 강제해도 출력이 바뀌지 않았고, i2v·r2v 양쪽 다 같았다.
+    또 r2v는 first_frame을 버려서 스틸→클립 연결이 깨지므로 i2v로만 간다."""
     import os
     base = (os.environ.get("PJN_API_URL") or PJN_API_BASE).rstrip("/")
     if ratio not in ("16:9", "3:4"):
         print(f"error: pjn 서버는 16:9/3:4만 지원 (요청 {ratio})", file=sys.stderr)
         return 1
-    body, boundary = _pjn_multipart(
-        {"mode": "i2v", "prompt": prompt, "aspect_ratio": ratio,
-         "quality": str(quality), "duration": str(max(5, min(15, int(duration))))},
-        "first_frame", frame,
-    )
+    fields = {"mode": "i2v", "prompt": prompt, "aspect_ratio": ratio,
+              "quality": str(quality), "duration": str(max(5, min(15, int(duration))))}
+    if seed is not None:
+        fields["seed"] = str(int(seed))
+    body, boundary = _pjn_multipart(fields, "first_frame", frame)
     req = urllib.request.Request(
         f"{base}/v1/jobs", data=body, method="POST",
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}",
@@ -554,6 +559,8 @@ def main() -> int:
                     help="기본: settings image.veo.engine → pjn(로컬 5090 서버·무료). "
                          "★gemini 는 선택지에 없다 — 영상 생성 영구 차단")
     ap.add_argument("--model", default=None)
+    ap.add_argument("--seed", type=int, default=None,
+                    help="인물별 목소리 고정용 시드. 같은 인물의 클립은 같은 값을 쓴다")
     ap.add_argument("--duration", type=int, default=8, choices=[4, 6, 8], help="클립 길이 (기본 8초)")
     ap.add_argument("--resolution", default=None, help="(구 gemini 전용 — 현재 미사용)")
     ap.add_argument("--ports", default=None, help="flow 전용: 유료 레인 포트(쉼표구분)")
@@ -712,7 +719,8 @@ def main() -> int:
             # ★정책 관문 3겹 — .env 에 PJN_API_KEY 자리에 Google 키가 들어가 있어도 여기서 죽는다.
             assert_video_key(key, engine, "veo_hook")
             print(f"로컬 5090 생성 시작 (무료, minimax-h3, {args.duration}s, q{pjn_quality})")
-            rc = veo_pjn(prompt, frame, out_path, key, ratio, pjn_quality, args.duration)
+            rc = veo_pjn(prompt, frame, out_path, key, ratio, pjn_quality, args.duration,
+                         seed=args.seed)
         else:
             try:
                 from flow_veo import run as flow_run
