@@ -2,7 +2,7 @@
   "chapter": "01",
   "cpm": 284,
   "interval_min": 2.0,
-  "runtime_min": 42.9,
+  "runtime_min": 43.0,
   "slots": 21,
   "items": [
     {
@@ -67,7 +67,7 @@
     },
     {
       "slot": 6,
-      "at_min": 11.47,
+      "at_min": 11.46,
       "para": 149,
       "speaker": null,
       "speaker_guess": "덕보",
@@ -79,7 +79,7 @@
     },
     {
       "slot": 7,
-      "at_min": 12.47,
+      "at_min": 12.46,
       "para": 162,
       "speaker": null,
       "speaker_guess": "덕보",
@@ -91,7 +91,7 @@
     },
     {
       "slot": 8,
-      "at_min": 15.45,
+      "at_min": 15.44,
       "para": 198,
       "speaker": null,
       "speaker_guess": null,
@@ -127,7 +127,7 @@
     },
     {
       "slot": 11,
-      "at_min": 20.27,
+      "at_min": 20.26,
       "para": 264,
       "speaker": null,
       "speaker_guess": "청지기",
@@ -139,7 +139,7 @@
     },
     {
       "slot": 12,
-      "at_min": 23.57,
+      "at_min": 23.56,
       "para": 318,
       "speaker": null,
       "speaker_guess": null,
@@ -151,7 +151,7 @@
     },
     {
       "slot": 13,
-      "at_min": 24.33,
+      "at_min": 24.32,
       "para": 328,
       "speaker": null,
       "speaker_guess": null,
@@ -163,7 +163,7 @@
     },
     {
       "slot": 14,
-      "at_min": 27.97,
+      "at_min": 27.96,
       "para": 377,
       "speaker": null,
       "speaker_guess": "덕보",
@@ -175,7 +175,7 @@
     },
     {
       "slot": 15,
-      "at_min": 28.36,
+      "at_min": 28.35,
       "para": 382,
       "speaker": null,
       "speaker_guess": null,
@@ -187,7 +187,7 @@
     },
     {
       "slot": 16,
-      "at_min": 31.15,
+      "at_min": 31.14,
       "para": 420,
       "speaker": null,
       "speaker_guess": "여인",
@@ -199,7 +199,7 @@
     },
     {
       "slot": 17,
-      "at_min": 32.83,
+      "at_min": 32.82,
       "para": 445,
       "speaker": null,
       "speaker_guess": "덕보",
@@ -211,8 +211,8 @@
     },
     {
       "slot": 18,
-      "at_min": 34.48,
-      "para": 469,
+      "at_min": 34.44,
+      "para": 468,
       "speaker": null,
       "speaker_guess": "덕보",
       "guess_evidence": "덕보가 항아리를 밀어 놓았습니다.",
@@ -223,8 +223,8 @@
     },
     {
       "slot": 19,
-      "at_min": 36.39,
-      "para": 497,
+      "at_min": 36.35,
+      "para": 496,
       "speaker": null,
       "speaker_guess": "덕보",
       "guess_evidence": "노인이 덕보의 어깨를 쳤습니다.",
@@ -235,8 +235,8 @@
     },
     {
       "slot": 20,
-      "at_min": 38.33,
-      "para": 524,
+      "at_min": 38.29,
+      "para": 523,
       "speaker": null,
       "speaker_guess": "덕보",
       "guess_evidence": "덕보가 그 자리에 서 있었어요.",
@@ -247,11 +247,11 @@
     },
     {
       "slot": 21,
-      "at_min": 41.1,
-      "para": 559,
+      "at_min": 41.15,
+      "para": 558,
       "speaker": null,
-      "speaker_guess": "여인",
-      "guess_evidence": "여인이 가락지를 손바닥에 올려놓았습니다.",
+      "speaker_guess": null,
+      "guess_evidence": null,
       "dialogue": "\"쫓겨날 때 다 빼앗기고 이것 하나 감췄소. 그런데 그날 밤 그 방에서, 이걸 쥐고 있는 게 부끄러웠소.\"",
       "scene": null,
       "output": "dialogue_01_21.mp4",
