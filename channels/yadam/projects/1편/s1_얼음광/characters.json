@@ -37,11 +37,11 @@
     },
     "anchorProp": "a faded indigo-dyed cotton skirt with a frayed hem, worn with a plain undyed white jacket",
     "anchorProp_ko": "바랜 쪽빛 무명 치마(단이 해짐) + 무명 흰 저고리",
-    "lock": "A Korean woman in her mid-twenties, small and slight, thin from hunger. oval face, flat low cheekbones, downturned eyes, small pointed nose, thin sparse brows, pale skin, faint vertical frown line. Black hair in a low tight bun with a plain wooden pin. Guarded unsmiling expression.",
+    "lock": "A beautiful Korean woman in her mid-twenties, small and slight, thin from hunger. soft oval face, delicate features, clear pale skin, slender well-shaped brows, large expressive almond eyes with long lashes and a slight downward tilt at the outer corners, small straight nose, soft lips. Black hair in a low tight bun with a plain wooden pin. Guarded, weary but graceful expression.",
     "negatives": [
-      "NO large round eyes, NO full cheeks",
+      "NO tiny narrow eyes, NO squinting, NO puffy eyelids",
       "NO grey clothing, NO red or pink clothing",
-      "NO ornate hairpin, NO jewelry, NO makeup"
+      "NO ornate hairpin, NO jewelry, NO heavy makeup"
     ],
     "framing": "waist",
     "turnaround": "assets/characters/s1_sundeok_turnaround.png"
