@@ -1,0 +1,95 @@
+{
+  "_about": "1화 「얼음광」 캐스트. 턴어라운드 대상 4명(편당 2~4명 상한). 아이는 정서적 배경으로만 쓰고 시트를 만들지 않는다(세이프티 가드레일). lock·negatives·anchorProp는 영문 전용 — 한글을 쓰면 모델이 시트 안에 캡션으로 그린다.",
+  "_anchor_plan": "축·색이 캐스트 안에서 겹치지 않게: 덕보=실루엣(장신·넓은 어깨)+회색 / 순덕=시그니처 색(바랜 쪽빛 치마) / 막실=크고 단순한 얼굴 특징(흰 수염)+굽은 등+황토색 / 청지기=착용 소품(갓·부채)+미색. 모자는 청지기 하나만.",
+  "_faceprint_plan": "같은 성별·연령대끼리 얼굴형·눈매를 다르게: 덕보(젊은 남) long-narrow/deep-set ↔ 청지기(중년 남) square-jawed/upturned ↔ 막실(노년 남) broad-flat/narrow-slit. 2화 캐스트를 만들 때 이 표와 대조할 것.",
+  "s1_deokbo": {
+    "name": "덕보",
+    "story": 1,
+    "tier": "lead",
+    "physical": {
+      "sex": "male",
+      "age": "29",
+      "build": "tall, broad-shouldered, lean and hard from labour",
+      "hair": "black hair tied in a plain topknot, no hat",
+      "eyes": "dark brown"
+    },
+    "anchorProp": "a coarse grey hemp jacket with a wide twisted-rope belt at the waist",
+    "anchorProp_ko": "거친 회색 삼베 저고리 + 허리에 굵은 새끼줄 띠",
+    "lock": "A 29-year-old Korean man, tall and broad-shouldered, lean from hard labour. long narrow face, hollow gaunt cheeks, deep-set eyes, high straight nose, thick dark straight brows, weather-reddened cheeks. Black hair in a plain topknot, no hat. Quiet expression.",
+    "negatives": [
+      "NO round or soft face, NO plump cheeks",
+      "NO blue or indigo clothing, NO brown or ochre clothing",
+      "NO hat, NO beard"
+    ],
+    "framing": "waist",
+    "turnaround": "assets/characters/s1_deokbo_turnaround.png"
+  },
+  "s1_sundeok": {
+    "name": "순덕",
+    "story": 1,
+    "tier": "lead",
+    "physical": {
+      "sex": "female",
+      "age": "mid-20s",
+      "build": "small, slight frame, thin from hunger",
+      "hair": "black hair pulled into a low tight bun with a plain wooden pin",
+      "eyes": "dark brown"
+    },
+    "anchorProp": "a faded indigo-dyed cotton skirt with a frayed hem, worn with a plain undyed white jacket",
+    "anchorProp_ko": "바랜 쪽빛 무명 치마(단이 해짐) + 무명 흰 저고리",
+    "lock": "A Korean woman in her mid-twenties, small and slight, thin from hunger. oval face, flat low cheekbones, downturned eyes, small pointed nose, thin sparse brows, pale skin, faint vertical frown line. Black hair in a low tight bun with a plain wooden pin. Guarded unsmiling expression.",
+    "negatives": [
+      "NO large round eyes, NO full cheeks",
+      "NO grey clothing, NO red or pink clothing",
+      "NO ornate hairpin, NO jewelry, NO makeup"
+    ],
+    "framing": "waist",
+    "turnaround": "assets/characters/s1_sundeok_turnaround.png"
+  },
+  "s1_maksil": {
+    "name": "막실 노인",
+    "story": 1,
+    "tier": "support",
+    "physical": {
+      "sex": "male",
+      "age": "late 60s",
+      "build": "short, stooped back, wiry",
+      "hair": "thin white hair in a small topknot, thin white beard",
+      "eyes": "dark, narrow"
+    },
+    "anchorProp": "a thin white beard and a stooped back, in a faded ochre-brown jacket",
+    "anchorProp_ko": "가늘고 흰 수염 + 굽은 등 + 바랜 황토색 저고리",
+    "lock": "A Korean man in his late sixties, short, wiry, shoulders rounded forward. broad flat face, heavy jowls, narrow slit eyes, large bulbous nose, faded grey brows, deep nasolabial folds. Thin white hair in a small topknot, thin white beard, no hat. Fond expression. Shown from the waist up.",
+    "negatives": [
+      "NO cartoon caricature, NO thick heavy outlines, NO exaggerated features",
+      "NO hat, NO straw hat",
+      "NO grey clothing, NO indigo clothing",
+      "NO tight head-and-shoulders crop"
+    ],
+    "framing": "waist",
+    "turnaround": "assets/characters/s1_maksil_turnaround.png"
+  },
+  "s1_steward": {
+    "name": "청지기",
+    "story": 1,
+    "tier": "support",
+    "physical": {
+      "sex": "male",
+      "age": "mid-40s",
+      "build": "medium height, well-fed, upright posture",
+      "hair": "black hair under a black horsehair hat",
+      "eyes": "dark"
+    },
+    "anchorProp": "a black horsehair gat hat and a pale cream overcoat, holding a closed folding fan",
+    "anchorProp_ko": "검은 갓 + 미색 두루마기 + 접은 부채",
+    "lock": "A Korean man in his mid-forties, visibly middle-aged, well-fed with a fuller face and a slight double chin, upright posture. square jaw, high cheekbones, upturned eyes with faint crow's feet, slightly hooked nose, sharply angled brows, thin lips. He wears a wide-brimmed black horsehair gat hat in EVERY view including the front view. Composed expression.",
+    "negatives": [
+      "NO bare head, NO view without the gat hat",
+      "NO youthful face, NO slender young man",
+      "NO beard, NO stooped posture",
+      "NO grey, ochre or indigo clothing"
+    ],
+    "framing": "waist",
+    "turnaround": "assets/characters/s1_steward_turnaround.png"
+  }
+}

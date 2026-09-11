@@ -19,6 +19,15 @@ channels/*/projects/
 !channels/*/projects/*/_script/**/
 !channels/*/projects/*/_script/**/*.md
 !channels/*/projects/*/_script/**/*.json
+!channels/*/projects/*/*/
+!channels/*/projects/*/*/characters.json
+!channels/*/projects/*/*/locations.json
+!channels/*/projects/*/*/storyboard.json
+channels/*/projects/*/*/assets/
+channels/*/projects/*/*/scenes/
+channels/*/projects/*/*/_video/
+channels/*/projects/*/*/*.png
+channels/*/projects/*/*/*.mp4
 renders/
 
 # ── research: 공유 대장(topic_log)·벤치마킹(refs)·제안서는 커밋,

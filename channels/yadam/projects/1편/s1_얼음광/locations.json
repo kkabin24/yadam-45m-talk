@@ -1,0 +1,11 @@
+{
+  "_about": "1화 재등장 장소. 시트는 편당 1곳만 만든다(SKILL.md). desc는 영문이고 문화 금지 항목을 desc 안에 직접 쓴다 — background.py는 negatives 필드를 읽지 않는다. 한글 원문은 desc_ko.",
+
+  "s1_icehouse_hill": {
+    "name": "얼음광 언덕",
+    "story": 1,
+    "desc_ko": "강 언덕 위. 방 한 칸 부엌 한 칸짜리 초가 움막 옆에 흙을 두껍게 덮은 둔덕(얼음광)이 붙어 있고, 둔덕 앞에 낮은 나무 문짝. 언덕 아래로 강과 나루터가 내려다보인다. 가난한 시골 노동 건축, 칠하지 않은 거친 목재와 흙.",
+    "desc": "A grassy riverbank hill in Joseon-era rural Korea. A small thatched-roof hut with rough unpainted timber walls, one room and one kitchen. Attached beside it, a low earth-covered mound — an ice cellar — with a short plank door set into the mound and straw packed around the doorframe. Below the hill, a wide river and a simple ferry landing with a wooden boat pulled up on the bank. Poor rural working architecture, rough and unpainted, packed earth yard, a wooden A-frame carrier leaning by the door. STRICTLY NO round door, NO arched doorway, NO painted red timber, NO curved upturned eaves, NO Chinese or Japanese building, NO European fairy-tale cottage, NO stone castle, NO people in the frame.",
+    "sheet": "assets/locations/s1_icehouse_hill_sheet.png"
+  }
+}
